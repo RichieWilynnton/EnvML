@@ -130,32 +130,32 @@ prettyTypTests =
   , (TyVar "x", "x")
 
     -- Arrow types
-  , (TyArr int int, "int -> int")
-  , (TyArr a b, "a -> b")
-  , (TyArr int (TyArr int int), "int -> int -> int")
-  , (TyArr (TyArr int int) int, "(int -> int) -> int")
+  , (TyArr int int, "(int -> int)")
+  , (TyArr a b, "(a -> b)")
+  , (TyArr int (TyArr int int), "(int -> (int -> int))")
+  , (TyArr (TyArr int int) int, "((int -> int) -> int)")
   , (TyArr a (TyArr b c),
-      "a -> b -> c")
+      "(a -> (b -> c))")
   , (TyArr (TyArr a b) c,
-      "(a -> b) -> c")
+      "((a -> b) -> c)")
 
     -- Forall types
   , (TyAll "a" a,
       "forall a. a")
   , (TyAll "a" (TyArr a a),
-      "forall a. a -> a")
+      "forall a. (a -> a)")
   , (TyAll "a" (TyAll "b" (TyArr a b)),
-      "forall a. forall b. a -> b")
+      "forall a. forall b. (a -> b)")
   , (TyArr (TyAll "a" a) int,
-      "(forall a. a) -> int")
+      "((forall a. a) -> int)")
   , (TyAll "a" (TyArr int a),
-      "forall a. int -> a")
+      "forall a. (int -> a)")
 
     -- Record types
   , (TyRcd "x" int,
       "{x : int}")
   , (TyRcd "f" (TyArr int int),
-      "{f : int -> int}")
+      "{f : (int -> int)}")
   , (TyRcd "r" (TyAll "a" a),
       "{r : forall a. a}")
 
@@ -181,29 +181,29 @@ prettyTypTests =
   , (TyBoxT [("x", Type int), ("y", Type b)] c,
       "[x : int, y : b] ===> c")
   , (TyArr (TyBoxT [] int) int,
-      "([] ===> int) -> int")
+      "(([] ===> int) -> int)")
   , (TyBoxT [] (TyArr int int),
-      "[] ===> int -> int")
+      "[] ===> (int -> int)")
 
     -- Substitution types
-  , (TySubstT a "x" int,
-      "a[x:=int]")
-  , (TySubstT a "x" (TyArr int int),
-      "a[x:=(int -> int)]")
+  , (TySubstT "x" int a,
+      "[x:=int]a")
+  , (TySubstT "x" (TyArr int int) a,
+      "[x:=(int -> int)]a")
 
-  , (TySubstT a "x" (TySubstT b "y" int),
-      "a[x:=b[y:=int]]")
+  , (TySubstT "x" (TySubstT "y" int b) a,
+      "[x:=[y:=int]b]a")
 
-  , (TyArr (TySubstT a "x" int) b,
-      "a[x:=int] -> b")
-  , (TySubstT a "x" (TyArr b c),
-      "a[x:=(b -> c)]")
+  , (TyArr (TySubstT "x" int a) b,
+      "([x:=int]a -> b)")
+  , (TySubstT "x" a (TyArr b c),
+      "[x:=a]((b -> c))")
 
-  , (TyAll "a" (TySubstT b "x" a),
-      "forall a. b[x:=a]")
+  , (TyAll "a" (TySubstT "x" b a),
+      "forall a. [x:=b]a")
 
-  , (TyBoxT [] (TySubstT a "x" int),
-      "[] ===> a[x:=int]")
+  , (TyBoxT [] (TySubstT "x" int a),
+      "[] ===> [x:=int]a")
 
     -- Module types
   , (TyModule (TySig []),
@@ -215,7 +215,7 @@ prettyTypTests =
   , (TyModule (TyArrowM (TyArr int int) (TySig [])),
       "((int -> int) ->m sig  end)")
   , (TyArr int (TyModule (TyArrowM int (TySig []))), 
-      "int -> (int ->m sig  end)")
+      "(int -> (int ->m sig  end))")
   ]
 
 spec :: Spec

@@ -16,6 +16,7 @@ library
                         EnvML.Parser.Parse
                         EnvML.Parser.HappyAlex.Parser
                         EnvML.Parser.HappyAlex.Lexer
+                        EnvML.Parser.ElabAST
                         Source.Desugar 
                         Source.Errors
                         Source.LocallyNameless

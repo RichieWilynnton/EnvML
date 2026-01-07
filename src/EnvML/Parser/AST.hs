@@ -37,7 +37,7 @@ data Typ
   | TyArr    Typ Typ        -- A -> B
   | TyAll    Name Typ       -- forall a'. T
   | TyBoxT   TyEnv Typ      -- [t1 : int, t2 : int, t3: bool] ==> A
-  | TySubstT Typ Name Typ   -- A[x:=B]
+  | TySubstT Name Typ Typ   -- [x:=A] B % substitute x for A in B
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- [t : A, t1 : Type, t2 : A=]
   | TyModule ModuleTyp      -- Note: First-class modules   
@@ -124,6 +124,10 @@ parensIf :: Bool -> String -> String
 parensIf True s = "(" ++ s ++ ")"
 parensIf False s = s
 
+parens :: Bool -> String -> String
+parens True s = "(" ++ s ++ ")"
+parens _ s = s
+
 showTyBind :: (Name, TyEnvE) -> String
 showTyBind (n, Type t) = n ++ " : " ++ show t
 showTyBind (n, Kind) = n ++ " : Type"
@@ -176,9 +180,9 @@ instance Show Typ where
   show (TyLit l) = show l
   show (TyVar s) = s
   show (TyArr t1 t2) =
-    let s1 = parensIf (typPrec t1 <= typPrec (TyArr t1 t2)) (show t1)
+    let s1 = parensIf (typPrec t1 < typPrec (TyArr t1 t2)) (show t1)
         s2 = show t2
-    in s1 ++ " -> " ++ s2
+    in "(" ++ s1 ++ " -> " ++ s2 ++ ")"
   show (TyAll x t) =
     let s = parensIf (typPrec t < typPrec (TyAll x t)) (show t)
     in "forall " ++ x ++ ". " ++ s
@@ -186,10 +190,10 @@ instance Show Typ where
     let sBinds = showTyEnv bs
         sTyp = parensIf (typPrec t < typPrec (TyBoxT bs t)) (show t)
     in "[" ++ sBinds ++ "] ===> " ++ sTyp
-  show (TySubstT t1 x t2) =
+  show (TySubstT x t1 t2) =
     let s1 = show t1
-        s2 = parensIf (typPrec t2 < typPrec (TySubstT t1 x t2)) (show t2)
-    in s1 ++ "[" ++ x ++ ":=" ++ s2 ++ "]"
+        s2 = parensIf (typPrec t2 < typPrec (TySubstT x t1 t2)) (show t2)
+    in "[" ++ x ++ ":=" ++ s1 ++ "]" ++ s2
   show (TyEnvt bs) = "[" ++ showTyEnv bs ++ "]"
   show (TyRcd label t) = "{" ++ label ++ " : " ++ show t ++ "}"
   show (TyModule mt) = show mt
