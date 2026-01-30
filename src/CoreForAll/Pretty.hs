@@ -2,7 +2,6 @@ module CoreForAll.Pretty where
 
 import CoreForAll.Syntax
 
--- | Helper to wrap strings in parentheses based on a condition
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"
 parensIf False s = s
@@ -35,7 +34,6 @@ stringOfTyp (TySubstT t1 t2) =
 stringOfTyp (TyEnvt bs) = "Env[" ++ showTyEnv bs ++ "]"
 stringOfTyp (TyRcd label t) = "{" ++ label ++ " : " ++ stringOfTyp t ++ "}"
 
--- | Precedence for Types
 typPrec :: Typ -> Int
 typPrec (TyLit _)      = 10
 typPrec (TyVar _)      = 10
@@ -89,67 +87,81 @@ stringOfExp (Fix e) = "fix " ++ parensIf (expPrec e < 2) (stringOfExp e)
 stringOfExp (If e1 e2 e3) =
     "if " ++ stringOfExp e1 ++ " then " ++ stringOfExp e2 ++ " else " ++ stringOfExp e3
 
-stringOfExp (Box env e) =
+stringOfExp op@(Box env e) =
     let sEnv = showEnv env
-        sE = parensIf (expPrec e < expPrec (Box env e)) (stringOfExp e)
+        sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
      in "[" ++ sEnv ++ "] |> " ++ sE
 
-stringOfExp (App e1 e2) =
-    let s1 = parensIf (expPrec e1 < expPrec (App e1 e2)) (stringOfExp e1)
-        s2 = parensIf (expPrec e2 <= expPrec (App e1 e2)) (stringOfExp e2)
+stringOfExp op@(App e1 e2) =
+    let s1 = parensIf (expPrec e1 < expPrec op) (stringOfExp e1)
+        s2 = parensIf (expPrec e2 <= expPrec op) (stringOfExp e2)
      in s1 ++ " " ++ s2
-
-stringOfExp (Sub e1 e2) = stringOfBinary e1 " - " e2 (expPrec (Sub e1 e2))
-stringOfExp (Mul e1 e2) = stringOfBinary e1 " ** " e2 (expPrec (Mul e1 e2))
-stringOfExp (Eq e1 e2)  = stringOfBinary e1 " == " e2 (expPrec (Eq e1 e2))
-
+stringOfExp (BinOp binOp) = stringOfBinOp binOp
 stringOfExp (Clos env e) =
     "<[" ++ showEnv env ++ "] | lam. " ++ stringOfExp e ++ ">"
 stringOfExp (TClos env e) =
     "<[" ++ showEnv env ++ "] | Lam. " ++ stringOfExp e ++ ">"
 
-stringOfExp (TApp e t) =
-    let sE = parensIf (expPrec e < expPrec (TApp e t)) (stringOfExp e)
+stringOfExp op@(TApp e t) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
      in sE ++ " @ " ++ stringOfTyp t
 
 stringOfExp (FEnv env) = "[" ++ showEnv env ++ "]"
 
 stringOfExp (Rec label e) = "{" ++ label ++ " = " ++ stringOfExp e ++ "}"
 
-stringOfExp (RProj e label) =
-    let sE = parensIf (expPrec e < expPrec (RProj e label)) (stringOfExp e)
+stringOfExp op@(RProj e label) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
      in sE ++ "." ++ label
 
-stringOfExp (Anno e t) =
-    let sE = parensIf (expPrec e < expPrec (Anno e t)) (stringOfExp e)
+stringOfExp op@(Anno e t) =
+    let sE = parensIf (expPrec e < expPrec op) (stringOfExp e)
      in sE ++ " : " ++ stringOfTyp t
 
--- | Helper for binary operators
-stringOfBinary :: Exp -> String -> Exp -> Int -> String
-stringOfBinary e1 op e2 p =
-    parensIf (expPrec e1 < p) (stringOfExp e1) ++ op ++
-    parensIf (expPrec e2 < p) (stringOfExp e2)
+
+stringOfBinOp :: BinOp -> String
+stringOfBinOp op@(Add e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
+     in s1 ++ " + " ++ s2
+stringOfBinOp op@(Sub e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
+     in s1 ++ " - " ++ s2
+stringOfBinOp op@(Mul e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
+     in s1 ++ " * " ++ s2
+stringOfBinOp op@(EqEq e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExp e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExp e2)
+     in s1 ++ " == " ++ s2
+
 
 -- | Precedence for Expressions
 expPrec :: Exp -> Int
-expPrec (Lit _)      = 10
-expPrec (Var _)      = 10
-expPrec (FEnv _)     = 10
-expPrec (Rec _ _)    = 10
-expPrec (RProj _ _)  = 9
-expPrec (App _ _)    = 8
-expPrec (TApp _ _)   = 8
-expPrec (Mul _ _)    = 7
-expPrec (Sub _ _)    = 6
-expPrec (Eq _ _)     = 5
-expPrec (Anno _ _)   = 4
-expPrec (Box _ _)    = 3
-expPrec (Clos _ _)   = 3
-expPrec (TClos _ _)  = 3
-expPrec (If {})   = 2
-expPrec (Fix _)      = 2
-expPrec (Lam _)      = 1
-expPrec (TLam _)     = 1
+expPrec (Lit _)     = 10
+expPrec (Var _)     = 10
+expPrec (FEnv _)    = 10
+expPrec (Rec _ _)   = 10
+expPrec (RProj _ _) = 9
+expPrec (App _ _)   = 8
+expPrec (TApp _ _)  = 8
+expPrec (BinOp _)   = 6
+expPrec (Anno _ _)  = 4
+expPrec (Box _ _)   = 3
+expPrec (Clos _ _)  = 3
+expPrec (TClos _ _) = 3
+expPrec (If {})     = 2
+expPrec (Fix _)     = 2
+expPrec (Lam _)     = 1
+expPrec (TLam _)    = 1
+
+binOpPrec :: BinOp -> Int
+binOpPrec (Mul _ _)  = 7
+binOpPrec (Add _ _)  = 6
+binOpPrec (Sub _ _)  = 6
+binOpPrec (EqEq _ _) = 5
 
 --------------------------------------------------------------------------------
 -- Utilities

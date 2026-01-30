@@ -70,9 +70,9 @@ Exp :: { Exp }
   | if Exp then Exp else Exp            { If $2 $4 $6 }
   | fix Exp                             { Fix $2 }
   | AppExp ':' Typ                      { Anno $1 $3 }
-  | AppExp '==' AppExp                  { Eq $1 $3 }
-  | AppExp '-' AppExp                   { Sub $1 $3 }
-  | AppExp '**' AppExp                  { Mul $1 $3 }
+  | AppExp '==' AppExp                  { BinOp (EqEq $1 $3) }
+  | AppExp '-' AppExp                   { BinOp (Sub $1 $3) }
+  | AppExp '**' AppExp                  { BinOp (Mul $1 $3) }
   | AppExp                              { $1 }
 
 -- Application expressions (left-associative)
