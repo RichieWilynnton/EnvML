@@ -1,7 +1,7 @@
 module EnvML.Examples.BasicModuleSpec (spec) where
 
 import Test.Hspec
-import EnvML.Parser.Parse
+import EnvML.Parse
 import EnvML.Parser.AST
 
 shouldParseAs :: IO Module -> Module -> Expectation
@@ -28,7 +28,7 @@ spec = do
 
       it "parses x.eml" $ 
         parseEmlFile "examples/rest/basic-module/x.eml" `shouldParseAs` Struct []
-          [ ("x", ExpE (Lit (LitInt 1)))
+          [ ExpEN "x" (Lit (LitInt 1))
           ]
 
       it "parses x.emli" $ 
