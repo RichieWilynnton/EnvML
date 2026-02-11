@@ -2,22 +2,25 @@
 module Repl where
 
 import System.Console.Haskeline
+    ( InputT,
+      Settings(..),
+      getInputLine,
+      outputStrLn,
+      completeFilename )
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception (catch, evaluate, SomeException)
 import Data.List (stripPrefix)
 import Data.Char (isSpace)
 
--- Import your modules
 import qualified EnvML.Parser.Parser as Parser
 import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
-import qualified Core.Named as CoreNamed
-import qualified Core.Syntax as Core
-import qualified Core.Check as Check
-import qualified Core.Eval as Eval
-import qualified Core.Pretty as Pretty
-import qualified Core.DeBruijn as DeBruijn
+import qualified CoreFE.Named as CoreNamed
+import qualified CoreFE.Syntax as CoreFE
+import qualified CoreFE.Check as Check
+import qualified CoreFE.Eval as Eval
+import qualified CoreFE.DeBruijn as DeBruijn
 
 banner :: String
 banner = unlines
@@ -25,7 +28,7 @@ banner = unlines
   , "║                    EnvML REPL v0.1                           ║"
   , "║  A Module System with First-Class Environments               ║"
   , "╠══════════════════════════════════════════════════════════════╣"
-  , "║  Pipeline: Source → Parse → Elaborate → Core (Named/Less)    ║"
+  , "║  Pipeline: Source → Parse → Elaborate → CoreFE (Named/Less)    ║"
   , "║  Type :help for available commands                           ║"
   , "╚══════════════════════════════════════════════════════════════╝"
   ]
@@ -71,7 +74,7 @@ printHelp = putStrLn $ unlines
   , "│                     EnvML REPL Commands                        │"
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│  :p <file>     Parse and print AST                             │"
-  , "│  :e <file>     Parse → Elaborate (Core.Named) → Print          │"
+  , "│  :e <file>     Parse → Elaborate (CoreFE.Named) → Print          │"
   , "│  :n <file>     Parse → Elaborate → De Bruijn → Print           │"
   , "│  :check <file> Full pipeline → Type check → Print result       │"
   , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
@@ -83,17 +86,13 @@ printHelp = putStrLn $ unlines
   , "│                     Pipeline Overview                          │"
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│  1. Parse      Source text → EnvML.Syntax.Module           │"
-  , "│  2. Elaborate  AST → Core.Named (with desugaring built-in)     │"
-  , "│  3. De Bruijn  Core.Named → Core.Syntax (names → indices)      │"
-  , "│  4. Check      Type inference/checking at Core level           │"
-  , "│  5. Eval       Evaluation at Core level                        │"
+  , "│  2. Elaborate  AST → CoreFE.Named (with desugaring built-in)     │"
+  , "│  3. De Bruijn  CoreFE.Named → CoreFE.Syntax (names → indices)      │"
+  , "│  4. Check      Type inference/checking at CoreFE level           │"
+  , "│  5. Eval       Evaluation at CoreFE level                        │"
   , "└─────────────────────────────────────────────────────────────────┘"
   , ""
   ]
-
--------------------------------------------------------------------------------
--- File Reading and Parsing
--------------------------------------------------------------------------------
 
 safeReadFile :: FilePath -> IO (Either String String)
 safeReadFile path = do
@@ -102,11 +101,9 @@ safeReadFile path = do
     handler :: SomeException -> IO (Either String String)
     handler e = return $ Left $ "Error reading file '" ++ path ++ "': " ++ show e
 
--- | Parse with error handling for Happy-generated parser errors
 safeParse :: String -> IO (Either String AST.Module)
 safeParse content = do
   let tokens = Lexer.lexer content
-  -- evaluate forces the parse result, catching any 'error' calls from Happy
   (Right <$> evaluate (Parser.parseModule tokens)) `catch` handler
   where
     handler :: SomeException -> IO (Either String AST.Module)
@@ -118,10 +115,6 @@ readAndParse path = do
   case result of
     Left err -> return $ Left err
     Right content -> safeParse content
-
--------------------------------------------------------------------------------
--- Pipeline Helpers
--------------------------------------------------------------------------------
 
 runPipeline :: FilePath 
             -> (AST.Module -> IO ()) 
@@ -135,7 +128,7 @@ runPipeline path action = do
 elaborate :: AST.Module -> CoreNamed.Exp
 elaborate = Elab.elabModule
 
-toDeBruijn :: CoreNamed.Exp -> Core.Exp
+toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn
 
 cmdParse :: FilePath -> IO ()
@@ -146,15 +139,15 @@ cmdParse path = runPipeline path $ \ast -> do
 cmdElaborate :: FilePath -> IO ()
 cmdElaborate path = runPipeline path $ \ast -> do
   let coreNamed = elaborate ast
-  putStrLn "=== Elaborated Core (Named) ==="
+  putStrLn "=== Elaborated CoreFE (Named) ==="
   print coreNamed
 
 cmdDeBruijn :: FilePath -> IO ()
 cmdDeBruijn path = runPipeline path $ \ast -> do
   let coreNamed = elaborate ast
   let coreNameless = toDeBruijn coreNamed
-  putStrLn "=== De Bruijn Core (Nameless) ==="
-  putStrLn $ Pretty.stringOfExp coreNameless
+  putStrLn "=== De Bruijn CoreFE (Nameless) ==="
+  putStrLn $ CoreFE.pretty coreNameless
 
 cmdCheck :: FilePath -> IO ()
 cmdCheck path = runPipeline path $ \ast -> do
@@ -165,7 +158,7 @@ cmdCheck path = runPipeline path $ \ast -> do
     Nothing -> putStrLn "✗ Type check failed: Could not infer type"
     Just typ -> do
       putStrLn "✓ Type check succeeded!"
-      putStrLn $ "  Type: " ++ Pretty.stringOfTyp typ
+      putStrLn $ "  Type: " ++ CoreFE.pretty typ
 
 cmdEval :: FilePath -> IO ()
 cmdEval path = runPipeline path $ \ast -> do
@@ -175,11 +168,11 @@ cmdEval path = runPipeline path $ \ast -> do
   -- Optionally type check first
   case Check.infer [] coreNameless of
     Nothing -> putStrLn "Warning: Type check failed, attempting evaluation anyway..."
-    Just typ -> putStrLn $ "Type: " ++ Pretty.stringOfTyp typ
+    Just typ -> putStrLn $ "Type: " ++ CoreFE.pretty typ
   
   putStrLn "=== Evaluation ==="
   case Eval.eval [] coreNameless of
     Nothing -> putStrLn "✗ Evaluation failed"
     Just result -> do
       putStrLn "✓ Result:"
-      putStrLn $ "  " ++ Pretty.stringOfExp result
+      putStrLn $ "  " ++ CoreFE.pretty result
