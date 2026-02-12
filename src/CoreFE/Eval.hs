@@ -84,3 +84,9 @@ eval env = go
         v1 <- eval env e1
         v2 <- eval env e2
         pure $ Lit (LitBool (v1 == v2))
+    go (EList es) = do
+        vs <- mapM (eval env) es
+        pure $ EList vs
+    go (ETake n e) = do
+        EList vs <- eval env e
+        pure $ EList (take n vs)

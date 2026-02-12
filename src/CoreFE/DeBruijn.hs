@@ -18,12 +18,12 @@ type TypNames   = [Name]
 -- index computation
 indexE :: Name -> ExpNames -> (Int, BindingKind)
 indexE x []    = error ("unbound: " ++ x)
-indexE x ((x', kind):g) = 
-  if x == x' then (0, kind) else 
+indexE x ((x', kind):g) =
+  if x == x' then (0, kind) else
     let (y, kind') = indexE x g
     in  (1 + y, kind')
 
-toNamelessExp :: 
+toNamelessExp ::
   ExpNames
   -> TypNames
   -> Named.Exp
@@ -31,15 +31,15 @@ toNamelessExp ::
 toNamelessExp eNames tNames e =
   case e of
     (Named.Lit i)    -> Nameless.Lit i
-    (Named.Var n)    -> 
+    (Named.Var n)    ->
       let (i, b) = indexE n eNames
       in  case b of
             TermBinding -> Nameless.Var i
             ModBinding  -> Nameless.RProj (Nameless.FEnv [Nameless.ExpE (Nameless.Var i)]) n
-    (Named.Lam x e1) -> 
+    (Named.Lam x e1) ->
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->
-      Nameless.Clos 
+      Nameless.Clos
         (toNamelessEnv eNames tNames env)
         (toNamelessExp (envToExpNames env) (envToTypNames env) e1)
     (Named.App e1 e2)    ->
@@ -49,7 +49,7 @@ toNamelessExp eNames tNames e =
     (Named.TLam n e1)    ->
       Nameless.TLam (toNamelessExp eNames (n:tNames) e1)
     (Named.TClos env e1) ->
-      Nameless.TClos 
+      Nameless.TClos
         (toNamelessEnv eNames tNames env)
         (toNamelessExp (envToExpNames env) (envToTypNames env) e1)
     (Named.TApp e1 a)    ->
@@ -67,9 +67,13 @@ toNamelessExp eNames tNames e =
     (Named.FEnv env)     ->
       Nameless.FEnv (toNamelessEnv eNames tNames env)
     (Named.Anno e1 ty)   ->
-      Nameless.Anno 
+      Nameless.Anno
         (toNamelessExp eNames tNames e1)
         (toNamelessTyp eNames tNames ty)
+    (Named.EList es)     ->
+      Nameless.EList (map (toNamelessExp eNames tNames) es)
+    (Named.ETake i e1)    ->
+      Nameless.ETake i (toNamelessExp eNames tNames e1)
 
 envToExpNames ::
   Named.Env
@@ -83,11 +87,11 @@ envToTypNames ::
   Named.Env
   -> TypNames
 envToTypNames []       = []
-envToTypNames (Named.TypE n _: rest) 
+envToTypNames (Named.TypE n _: rest)
                        = n:envToTypNames rest
 envToTypNames (_:rest) = envToTypNames rest
 
-toNamelessEnv :: 
+toNamelessEnv ::
   ExpNames
   -> TypNames
   -> Named.Env
@@ -96,7 +100,7 @@ toNamelessEnv _ _ [] = []
 toNamelessEnv eNames tNames (e:env)=
   let restExpNames = envToExpNames env ++ eNames
       restTypNames = envToTypNames env ++ tNames
-      e'   = toNamelessEnvE restExpNames restTypNames e 
+      e'   = toNamelessEnvE restExpNames restTypNames e
       env' = toNamelessEnv eNames tNames env
   in  e':env'
 
@@ -130,12 +134,12 @@ toNamelessTyp eNames tNames ty =
   case ty of
     Named.TyLit i       -> Nameless.TyLit i
     Named.TyVar n       -> Nameless.TyVar (indexT n tNames)
-    Named.TyArr a b     -> 
+    Named.TyArr a b     ->
       Nameless.TyArr (toNamelessTyp eNames tNames a) (toNamelessTyp eNames tNames b)
     Named.TyAll n a     ->
       Nameless.TyAll (toNamelessTyp eNames (n:tNames) a)
     Named.TyBoxT tyEnv a ->
-      Nameless.TyBoxT 
+      Nameless.TyBoxT
         (toNamelessTyEnv eNames tNames tyEnv)
         (toNamelessTyp [] (getTyEntryNames tyEnv) a)
     Named.TySubstT n a b ->
@@ -146,6 +150,8 @@ toNamelessTyp eNames tNames ty =
       Nameless.TyRcd l (toNamelessTyp eNames tNames a)
     Named.TyEnvt env    ->
       Nameless.TyEnvt (toNamelessTyEnv eNames tNames env)
+    Named.TyList a      ->
+      Nameless.TyList (toNamelessTyp eNames tNames a)
 
 getTyEntryNames ::
   Named.TyEnv
@@ -164,7 +170,7 @@ getTyEntryName (Named.Type n _)   = n
 getTyEntryName (Named.Kind n)     = n
 getTyEntryName (Named.TypeEq n _) = n
 
-toNamelessTyEnv :: 
+toNamelessTyEnv ::
   ExpNames
   -> TypNames
   -> Named.TyEnv

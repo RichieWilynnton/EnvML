@@ -27,6 +27,9 @@ data Exp
   | RProj Exp String
   | FEnv  Env
   | Anno  Exp Typ
+  -- List primitives
+  | EList  [Exp]        -- [e1, e2, e3]
+  | ETake  Int Exp      -- take(n, ls)
   deriving (Eq, Show)
 
 type TyEnv = [TyEnvE]
@@ -45,6 +48,7 @@ data Typ
   | TySubstT Name Typ Typ   -- [t = A] B
   | TyRcd    String Typ     -- {l : A}
   | TyEnvt   TyEnv          -- Γ
+  | TyList   Typ            -- [A]
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -84,6 +88,7 @@ prettyTyp (TySubstT n t1 t2) =
     "[" ++ n ++ " = " ++ prettyTyp t1 ++ "] " ++ prettyTyp t2
 prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
 prettyTyp (TyEnvt env) = "Env[" ++ prettyTyEnv env ++ "]"
+prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 
 prettyTyLit :: Nameless.TyLit -> String
 prettyTyLit Nameless.TyInt  = "int"
@@ -125,6 +130,9 @@ prettyExp (RProj e label) =
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) =
     parenIf (needsParenExp e) (prettyExp e) ++ " : " ++ prettyTyp t
+prettyExp (EList []) = "List[]"
+prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
+prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
 
 needsParenExp :: Exp -> Bool
 needsParenExp (App _ _) = True
@@ -139,6 +147,7 @@ needsParenProj (Var _) = False
 needsParenProj (RProj _ _) = False
 needsParenProj (FEnv _) = False
 needsParenProj (Rec _ _) = False
+needsParenProj (EList _) = False
 needsParenProj _ = True
 
 prettyEnv :: Env -> String

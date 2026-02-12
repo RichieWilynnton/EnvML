@@ -42,7 +42,7 @@ data IntfE
   deriving (Show, Eq)
 
 data Typ
-  = TyLit     CoreFE.TyLit           -- int, bool, or string
+  = TyLit     CoreFE.TyLit    -- int, bool, or string
   | TyVar     Name            -- x
   | TyArr     Typ   Typ       -- A -> B
   | TyAll     Name  Typ       -- forall a'. T
@@ -50,6 +50,7 @@ data Typ
   | TyRcd     [(Name, Typ)]   -- {l1 : A1, l2 : A2, ln : An}
   | TyCtx     TyCtx           -- [t : A, t1 : Type, t2 : A=]
   | TyModule  ModuleTyp       -- Note: First-class modules
+  | TyList    Typ             -- [A]
   deriving (Show, Eq)
 
 
@@ -83,19 +84,22 @@ data EnvE
 
 data Exp
   = Lit   CoreFE.Literal    -- Literals: int, double, bool, string
-  | Var   Name            -- Var x, y, hello
-  | Lam   FunArgs Exp     -- fun (x: A) (y : B) -> x + 1
-  | TLam  FunArgs Exp     -- fun 
-  | Clos  Env FunArgs Exp -- clos [type t = int, x = 1] (y: t) -> x + y
-  | App   Exp Exp         -- f(x)
-  | TClos Env FunArgs Exp -- clos [type t = int, x = 1] ->
-  | TApp  Exp Typ         -- f<t>
-  | Box   Env Exp         -- box [type t = int, x = 1] in e
-  | Rec   [(Name, Exp)]   -- {l1 = e1, l2 = e2, l3 = e3}
-  | RProj Exp Name        -- e.l
-  | FEnv  Env             -- [type a = int, x = 1]
-  | Anno  Exp Typ         -- (e::A)
-  | Mod   Module          -- functor or struct
+  | Var   Name              -- Var x, y, hello
+  | Lam   FunArgs Exp       -- fun (x: A) (y : B) -> x + 1
+  | TLam  FunArgs Exp       -- fun 
+  | Clos  Env FunArgs Exp   -- clos [type t = int, x = 1] (y: t) -> x + y
+  | App   Exp Exp           -- f(x)
+  | TClos Env FunArgs Exp   -- clos [type t = int, x = 1] ->
+  | TApp  Exp Typ           -- f @t
+  | Box   Env Exp           -- box [type t = int, x = 1] in e
+  | Rec   [(Name, Exp)]     -- {l1 = e1, l2 = e2, l3 = e3}
+  | RProj Exp Name          -- e.l
+  | FEnv  Env               -- [type a = int, x = 1]
+  | Anno  Exp Typ           -- (e::A)
+  | Mod   Module            -- functor or struct
+  -- Lists
+  | EList [Exp]             -- [e1, e2, e3]
+  | ETake Int Exp           -- take(n, ls)
   -- Extensions
   | BinOp BinOp
   deriving (Show, Eq)
@@ -116,6 +120,7 @@ typPrec t = case t of
   TyRcd {}    -> 4
   TyCtx _     -> 4
   TyModule _  -> 4
+  TyList _    -> 4
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
@@ -135,6 +140,8 @@ expPrec e = case e of
   Rec {}    -> 5
   FEnv _    -> 5
   Mod _     -> 5
+  EList _   -> 5
+  ETake _ _ -> 5
   _ -> 4 -- TODO: Extensions
 
 
@@ -177,6 +184,11 @@ instance Pretty Structure where
 parensIf :: Bool -> String -> String
 parensIf True s = "(" ++ s ++ ")"
 parensIf False s = s
+
+intercalateComma :: [String] -> String
+intercalateComma [] = ""
+intercalateComma [x] = x
+intercalateComma (x:xs) = x ++ ", " ++ intercalateComma xs
 
 -- TyCtx pretty printing (updated for new TyCtxE constructors)
 prettyTyCtxE :: TyCtxE -> String
@@ -237,12 +249,12 @@ prettyModuleTyp :: ModuleTyp -> String
 prettyModuleTyp (TyArrowM t m) = 
   prettyTyp t ++ " ->m " ++ prettyModuleTyp m
 prettyModuleTyp (ForallM n m) = 
-  "∀" ++ n ++ ". " ++ prettyModuleTyp m
+  "forall " ++ n ++ ". " ++ prettyModuleTyp m
 prettyModuleTyp (TySig intf) = 
   "sig " ++ prettyIntf intf ++ " end"
 prettyModuleTyp (TyVarM n) = n
 
--- Type pretty printing (same as before)
+-- Type pretty printing
 prettyTyp :: Typ -> String
 prettyTyp (TyLit l) = CoreFE.pretty l
 prettyTyp (TyVar s) = s
@@ -261,11 +273,8 @@ prettyTyp (TyCtx ctx) = "[" ++ prettyTyCtx ctx ++ "]"
 prettyTyp (TyRcd []) = "{}"
 prettyTyp (TyRcd fields) = 
   "{" ++ intercalateComma (map (\(l, t) -> l ++ " : " ++ prettyTyp t) fields) ++ "}"
-  where
-    intercalateComma [] = ""
-    intercalateComma [x] = x
-    intercalateComma (x:xs) = x ++ ", " ++ intercalateComma xs
 prettyTyp (TyModule mt) = prettyModuleTyp mt
+prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 
 prettyStructures :: Structures -> String
 prettyStructures = concatMap (\s -> prettyStructure s ++ "\n")
@@ -297,11 +306,11 @@ prettyModule (Functor args m) =
 prettyModule (Struct structs) =
   "struct " ++ prettyStructures structs ++ " end"
 prettyModule (MApp m1 m2) = 
-  prettyModule m1 ++ " ^ " ++ prettyModule m2
+  prettyModule m1 ++ "(" ++ prettyModule m2 ++ ")"
 prettyModule (MAppt m t) = 
-  prettyModule m ++ " ^@ " ++ prettyTyp t
+  prettyModule m ++ " @" ++ prettyTyp t
 prettyModule (MAnno m1 mty) =
-  "("++ prettyModule m1 ++ "::" ++ prettyModuleTyp mty ++ ")"
+  "(" ++ prettyModule m1 ++ " :: " ++ prettyModuleTyp mty ++ ")"
 
 -- Expression pretty printing
 prettyExp :: Exp -> String
@@ -324,21 +333,23 @@ prettyExp (App e1 e2) =
   "(" ++ prettyExp e2 ++ ")"
 prettyExp (TApp e t) = 
   parensIf (expPrec e < expPrec (TApp e t)) (prettyExp e) ++ 
-  "<" ++ prettyTyp t ++ ">"
+  " @" ++ prettyTyp t
 prettyExp (Box env e) = 
   "box [" ++ prettyEnv env ++ "] in " ++ 
   parensIf (expPrec e < expPrec (Box env e)) (prettyExp e)
 prettyExp (Rec []) = "{}"
 prettyExp (Rec fields) = 
   "{" ++ intercalateComma (map (\(l, e) -> l ++ " = " ++ prettyExp e) fields) ++ "}"
-  where
-    intercalateComma [] = ""
-    intercalateComma [x] = x
-    intercalateComma (x:xs) = x ++ ", " ++ intercalateComma xs
 prettyExp (RProj e label) = 
   parensIf (expPrec e < expPrec (RProj e label)) (prettyExp e) ++ "." ++ label
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) = 
   parensIf (expPrec e < expPrec (Anno e t)) (prettyExp e) ++ " :: " ++ prettyTyp t
 prettyExp (Mod m) = prettyModule m
-prettyExp (BinOp op) = show op
+prettyExp (EList []) = "List[]"
+prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
+prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
+prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
+prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
+prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
+prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2

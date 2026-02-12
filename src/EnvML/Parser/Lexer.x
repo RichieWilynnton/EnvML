@@ -35,6 +35,10 @@ tokens :-
   struct      { \_ -> TokStruct  }
   link        { \_ -> TokLink  }
   import      { \_ -> TokImport  }
+  take        { \_ -> TokTake }
+  nil         { \_ -> TokNil  }
+  list        { \_ -> TokList }
+  List        { \_ -> TokListE }
 
   -- Symbols
   "="         { \_ -> TokEq       }
@@ -93,6 +97,10 @@ data Token
   | TokFunctor
   | TokStruct
   | TokImport
+  | TokTake
+  | TokNil
+  | TokList
+  | TokListE
   -- Symbol Tokens
   | TokEq
   | TokColon    

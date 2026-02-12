@@ -110,6 +110,9 @@ prettyNamedExpShort (Named.Rec l e) = "{" ++ l ++ " = " ++ prettyNamedExpShort e
 prettyNamedExpShort (Named.RProj e l) = prettyNamedExpShort e ++ "." ++ l
 prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
+prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
+prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
+
 
 prettyNamedEnvShort :: Named.Env -> String
 prettyNamedEnvShort [] = "[]"
@@ -159,8 +162,11 @@ prettyDeBruijnExpShort (CoreFE.RProj e l) = prettyDeBruijnExpShort e ++ "." ++ l
 prettyDeBruijnExpShort (CoreFE.FEnv env) = prettyDeBruijnEnvShort env
 prettyDeBruijnExpShort (CoreFE.Anno e _) = prettyDeBruijnExpShort e
 prettyDeBruijnExpShort (CoreFE.Fix _) = "fix ..."
-prettyDeBruijnExpShort (CoreFE.If _ _ _) = "if ... then ... else ..."
+prettyDeBruijnExpShort (CoreFE.If {}) = "if ... then ... else ..."
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
+prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
+prettyDeBruijnExpShort (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+
 
 prettyDeBruijnBinOpShort :: CoreFE.BinOp -> String
 prettyDeBruijnBinOpShort (CoreFE.Add e1 e2) = prettyDeBruijnExpShort e1 ++ " + " ++ prettyDeBruijnExpShort e2
@@ -202,6 +208,9 @@ prettyDeBruijnExp (CoreFE.Anno e t) = parenIf (needsParenCore e) (prettyDeBruijn
 prettyDeBruijnExp (CoreFE.Fix e) = "fix " ++ prettyDeBruijnExp e
 prettyDeBruijnExp (CoreFE.If e1 e2 e3) = "if " ++ prettyDeBruijnExp e1 ++ " then " ++ prettyDeBruijnExp e2 ++ " else " ++ prettyDeBruijnExp e3
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
+prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
+prettyDeBruijnExp (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+
 
 prettyDeBruijnBinOp :: CoreFE.BinOp -> String
 prettyDeBruijnBinOp (CoreFE.Add e1 e2) = prettyDeBruijnExp e1 ++ " + " ++ prettyDeBruijnExp e2
@@ -230,6 +239,7 @@ prettyDeBruijnTyp (CoreFE.TyBoxT env t) = "[" ++ prettyDeBruijnTyEnv env ++ "] =
 prettyDeBruijnTyp (CoreFE.TySubstT t1 t2) = "#[" ++ prettyDeBruijnTyp t1 ++ "] " ++ prettyDeBruijnTyp t2
 prettyDeBruijnTyp (CoreFE.TyRcd l t) = "{" ++ l ++ " : " ++ prettyDeBruijnTyp t ++ "}"
 prettyDeBruijnTyp (CoreFE.TyEnvt env) = "Env[" ++ prettyDeBruijnTyEnv env ++ "]"
+prettyDeBruijnTyp (CoreFE.TyList es) = "list " ++ prettyDeBruijnTyp es
 
 prettyDeBruijnTyEnv :: CoreFE.TyEnv -> String
 prettyDeBruijnTyEnv [] = ""

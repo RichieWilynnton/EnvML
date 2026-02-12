@@ -96,6 +96,8 @@ elabExp e =
     (EnvML.Mod m)           -> elabModuleExp m
     (EnvML.BinOp op)        ->
       error $ "TODO: Binary operators to be supported " ++ show op
+    (EnvML.EList es)        -> CoreFE.EList (map elabExp es)
+    (EnvML.ETake i e1)      -> CoreFE.ETake i (elabExp e1)
 
 elabLambda :: EnvML.FunArgs -> EnvML.Exp -> CoreFE.Exp
 elabLambda [] body = elabExp body
@@ -137,6 +139,7 @@ elabTyp ty =
     (EnvML.TyRcd fields)    -> CoreFE.TyEnvt $ map (CoreFE.Type "_") $ elabRcdFieldsTy fields
     (EnvML.TyCtx ctx)       -> CoreFE.TyEnvt  (elabTyCtx ctx)
     (EnvML.TyModule mty)    -> elabModTyp mty
+    (EnvML.TyList ty1)      -> CoreFE.TyList $ elabTyp ty1
 
 elabTyCtx :: EnvML.TyCtx -> CoreFE.TyEnv
 elabTyCtx = reverse . map elabTyCtxE

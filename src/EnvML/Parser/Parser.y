@@ -39,6 +39,10 @@ import qualified CoreFE.Syntax as CoreFE
   functor   { TokFunctor }
   struct    { TokStruct }
   link      { TokLink }
+  take      { TokTake }
+  nil       { TokNil }
+  list      { TokList }
+  List      { TokListE }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
@@ -134,15 +138,23 @@ Term :: { Exp }
   | Atom                 { $1 }
 
 Atom :: { Exp }
-  : num                  { Lit (CoreFE.LitInt $1) }
-  | str                  { Lit (CoreFE.LitStr $1) }
-  | true                 { Lit (CoreFE.LitBool True) }
-  | false                { Lit (CoreFE.LitBool False) }
-  | id                   { Var $1 }
-  | '{' RecFields '}'    { Rec $2 }
-  | '[' Env ']'          { FEnv $2 }
-  | '(' Exp ')'          { $2 }
-  | ModuleExp            { Mod $1 }
+  : num                       { Lit (CoreFE.LitInt $1) }
+  | str                       { Lit (CoreFE.LitStr $1) }
+  | true                      { Lit (CoreFE.LitBool True) }
+  | false                     { Lit (CoreFE.LitBool False) }
+  | id                        { Var $1 }
+  | '{' RecFields '}'         { Rec $2 }
+  | '[' Env ']'               { FEnv $2 }
+  | List '[' ListElems ']'    { EList $3 }
+  | nil                       { EList [] }
+  | take '(' num ',' Exp ')'  { ETake $3 $5 }
+  | '(' Exp ')'               { $2 }
+  | ModuleExp                 { Mod $1 }
+
+ListElems :: { [Exp] }
+  : Exp ',' ListElems    { $1 : $3 }
+  | Exp                  { [$1] }
+  |                      { [] }
 
 RecFields :: { [(Name, Exp)] }
   : id '=' Exp ',' RecFields  { ($1, $3) : $5 }
@@ -172,10 +184,10 @@ EnvElem :: { EnvE }
 
 
 Typ :: { Typ }
-  : BaseTyp '->' Typ                  { TyArr $1 $3 }
-  | forall id '.' Typ                 { TyAll $2 $4 }
-  | '[' TyCtx ']' '===>' Typ          { TyBoxT $2 $5 }
-  | BaseTyp                           { $1 }
+  : BaseTyp '->' Typ                   { TyArr $1 $3 }
+  | forall id '.' Typ                  { TyAll $2 $4 }
+  | '[' TyCtx ']' '===>' Typ           { TyBoxT $2 $5 }
+  | BaseTyp                            { $1 }
 
 BaseTyp :: { Typ }
   : int                    { TyLit CoreFE.TyInt }
@@ -184,6 +196,7 @@ BaseTyp :: { Typ }
   | id                     { TyVar $1 }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
+  | list BaseTyp           { TyList $2 }
   | '(' Typ ')'            { $2 }
   | ModuleTyp              { TyModule $1 }
 

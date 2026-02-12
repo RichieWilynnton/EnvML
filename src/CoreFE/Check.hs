@@ -40,6 +40,7 @@ tshift _ (TyBoxT t a) = TyBoxT t a -- BoxT is opaque, no shifting inside
 tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
+tshift x (TyList a)  = TyList (tshift x a)
 
 -- | Helper for shifting bindings in an typing environment
 
@@ -237,6 +238,21 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
+infer _ (EList [])  = Nothing
+infer g (EList [e]) = do
+  t <- infer g e
+  return (TyList t)
+infer g (EList (e:es)) = do
+  t   <- infer g e
+  ts  <- infer g (EList es)
+  case ts of
+    TyList t' -> if t == t' then return ts else Nothing
+    _ -> Nothing
+infer g (ETake _ es)  = do
+  ts <- infer g es
+  case ts of
+    TyList _ -> return ts
+    _ -> Nothing
 infer _ _ = Nothing -- Other cases cannot be inferred
 
 -- | Check an expression against a type
@@ -254,6 +270,8 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
+check _ (EList []) (TyList _) = True
+check _ (EList []) _ = False
 check g e t =
   case infer g e of
     Just t' -> teq g t' t g -- Use type equality

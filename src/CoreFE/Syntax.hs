@@ -18,6 +18,7 @@ data Typ
   | TySubstT Typ Typ
   | TyRcd String Typ
   | TyEnvt TyEnv
+  | TyList Typ          -- [A]
   deriving (Eq, Show)
 
 data TyLit
@@ -48,6 +49,9 @@ data Exp
   | Fix   Exp
   | If    Exp Exp Exp
   | BinOp BinOp
+  -- List primitives
+  | EList  [Exp]        -- [e1, e2, e3]
+  | ETake  Int Exp      -- take(n, ls)
   deriving (Eq, Show)
 
 data BinOp
@@ -133,12 +137,14 @@ stringOfTyp (TySubstT t1 t2) =
      in "#[" ++ s1 ++ "] " ++ s2
 stringOfTyp (TyEnvt bs) = "Env[" ++ showTyEnv bs ++ "]"
 stringOfTyp (TyRcd label t) = "{" ++ label ++ " : " ++ stringOfTyp t ++ "}"
+stringOfTyp (TyList t) = "[" ++ stringOfTyp t ++ "]"
 
 typPrec :: Typ -> Int
 typPrec (TyLit _)      = 10
 typPrec (TyVar _)      = 10
 typPrec (TyRcd _ _)    = 10
 typPrec (TyEnvt _)     = 10
+typPrec (TyList _)     = 10
 typPrec (TySubstT _ _) = 8
 typPrec (TyBoxT _ _)   = 8
 typPrec (TyArr _ _)    = 4
@@ -232,6 +238,12 @@ stringOfExpI lvl op@(Anno e t) =
     let sE = parensIf (expPrec e < expPrec op) (stringOfExpI lvl e)
      in sE ++ " : " ++ stringOfTyp t
 
+-- List expressions
+stringOfExpI _lvl (EList [])  = "List[]"
+stringOfExpI lvl (EList es)   = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
+stringOfExpI lvl (ETake n ls) = 
+    "take(" ++ show n ++ ", " ++ stringOfExpI lvl ls ++ ")"
+
 -- Heuristic: an env is "small" if it has <= 2 entries and no nested FEnv
 isSmallEnv :: [EnvE] -> Bool
 isSmallEnv entries =
@@ -246,6 +258,7 @@ isSimpleExp (Lit _)     = True
 isSimpleExp (Var _)     = True
 isSimpleExp (Rec _ e)   = isSimpleExp e
 isSimpleExp (RProj e _) = isSimpleExp e
+isSimpleExp (EList es)  = length es <= 3 && all isSimpleExp es
 isSimpleExp _           = False
 
 showEnvInline :: Env -> String
@@ -285,6 +298,8 @@ expPrec (Lit _)     = 10
 expPrec (Var _)     = 10
 expPrec (FEnv _)    = 10
 expPrec (Rec _ _)   = 10
+expPrec (EList _)   = 10
+expPrec (ETake _ _) = 10
 expPrec (RProj _ _) = 9
 expPrec (App _ _)   = 8
 expPrec (TApp _ _)  = 8
