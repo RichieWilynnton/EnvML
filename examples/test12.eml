@@ -3,20 +3,8 @@ module type ACCESS_POLICY =
     val reshape : list t -> list t; 
   end;
 
-module previewPolicy : ACCESS_POLICY = 
-  functor (type t) -> 
-    struct
-      let reshape : list t -> list t = fun (ls) -> take(2, ls);
-    end;
-
-module mockPolicy : ACCESS_POLICY = 
-  functor (type t) -> 
-    struct
-      let reshape : list t -> list t = fun (ls) -> ls;
-    end;
-
 module queryProcessor : 
-  (forall t. sig val reshape : list t -> list t; end)
+  ACCESS_POLICY
   ->m sig 
         type a = int; 
         val query : list a -> list a; 
@@ -26,13 +14,3 @@ module queryProcessor :
         type a = int;
         let query : list a -> list a = ((policy @a) :: sig val reshape : list int -> list int; end).reshape;
       end;
-
-let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
-  fun (processor) -> 
-    box [proc = processor] in (proc.query :: list int -> list int)(List[3, 1, 2]);
-
-let previewResult : list int = 
-  executeQuery((queryProcessor(previewPolicy) :: sig type a = int; val query : list a -> list a; end));
-
-let mockResult : list int = 
-  executeQuery((queryProcessor(mockPolicy) :: sig type a = int; val query : list a -> list a; end));

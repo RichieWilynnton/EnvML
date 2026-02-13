@@ -4,52 +4,24 @@ import Control.Monad (guard)
 import CoreFE.Syntax
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
-
-{-
-    keyLen[·]       = 0
-    keyLen[A,  Γ]   = keyLen(Γ)
-    keyLen[A=, Γ]   = 1 + keyLen(Γ)
-    keyLen[*,  Γ]   = 1 + keyLen(Γ)
--}
 keyLen :: TyEnv -> Int
 keyLen [] = 0
 keyLen (Type _ : bs) = keyLen bs
 keyLen (Kind : bs) = 1 + keyLen bs
 keyLen (TypeEq _ : bs) = 1 + keyLen bs
 
--- | Type shifting: shifts type variable indices >= x by 1
---   tshift x typ returns the shifted type
-
-{-
-    (x, int)↑   = int
-    (x, _y_)↑   = _(1 + y)_ if x <= y
-                = _y_       otherwise
-    (x, A→B)↑   = (x, A)↑ → (x, B)↑
-    (x, ∀A)↑    = ∀. (1 + x, A)↑
-    (x, Γ|>A)↑  = Γ|>A
-    (x, [A]B)↑  = [(x, A)↑] (1 + x, B)↑
-    (x, {l:A})↑ = {l : (x, A)↑}
-    (x, Γ)↑     = (x, Γ)c↑
--}
+-- | Type shifting
 tshift :: Int -> Typ -> Typ
 tshift _ (TyLit i) = TyLit i
 tshift x (TyVar y) = if x <= y then TyVar (1 + y) else TyVar y
 tshift x (TyArr a1 a2) = TyArr (tshift x a1) (tshift x a2)
 tshift x (TyAll a) = TyAll (tshift (1 + x) a)
-tshift _ (TyBoxT t a) = TyBoxT t a -- BoxT is opaque, no shifting inside
+tshift _ (TyBoxT t a) = TyBoxT t a
 tshift x (TySubstT a1 a2) = TySubstT (tshift x a1) (tshift (1 + x) a2)
 tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
-tshift x (TyList a)  = TyList (tshift x a)
+tshift x (TyList a) = TyList (tshift x a)  -- ADD THIS
 
--- | Helper for shifting bindings in an typing environment
-
-{-
-    [·](i)     = ·
-    [* , Γ](i) = *, [Γ]i
-    [A , Γ](i) = [A](i + |Γ|), [Γ](i)
-    [A=, Γ](i) = [A](i + |Γ|)=, [Γ](i)
--}
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
 tshiftBinds x (Kind : bs) = Kind : tshiftBinds x bs
@@ -58,16 +30,6 @@ tshiftBinds x (Type a : bs) =
 tshiftBinds x (TypeEq a : bs) =
   TypeEq (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
--- | Check if an environment is concrete (contains no Etvar bindings)
-
-{-
-    [·](i)      = ⊥
-    [A,  Γ](i)  = [Γ](i)
-    [A=, Γ](0)  = ⊥
-    [A=, Γ](i)  = [Γ](i-1)
-    [*,  Γ](0)  = 0
-    [*,  Γ](i)  = 1 + [Γ](i - 1)
--}
 inner :: TyEnv -> Int -> Maybe Int
 inner [] _ = Nothing
 inner (Type _ : g) x = inner g x
@@ -76,8 +38,6 @@ inner (TypeEq _ : g) x = inner g (x - 1)
 inner (Kind : _g) 0 = pure 0
 inner (Kind : g) x = (+ 1) <$> inner g (x - 1)
 
--- | Look up a type variable in an environment
---   Returns the type associated with the index, shifted appropriately
 lookt :: TyEnv -> Int -> Maybe Typ
 lookt [] _ = Nothing
 lookt (Type _ : t) x = lookt t x
@@ -86,11 +46,8 @@ lookt (TypeEq _a : t) x = tshift 0 <$> lookt t (x - 1)
 lookt (Kind : _t) 0 = Nothing
 lookt (Kind : t) x = tshift 0 <$> lookt t (x - 1)
 
-{-
-    if * ∉ Γ, then Γ is concrete.
--}
 concrete :: TyEnv -> Bool
-concrete g = and [x /= Kind | x <- g]
+concrete g = all (/= Kind) g
 
 teq :: TyEnv -> Typ -> Typ -> TyEnv -> Bool
 teq _ (TyLit a) (TyLit b) _ = a == b
@@ -120,9 +77,10 @@ teq g1 (TyEnvt e1) (TyEnvt e2) g2 =
   teqEnv g1 e1 e2 g2
 teq g1 (TyRcd l1 a) (TyRcd l2 b) g2 =
   l1 == l2 && teq g1 a b g2
+teq g1 (TyList a) (TyList b) g2 =  -- ADD THIS
+  teq g1 a b g2
 teq _ _ _ _ = False
 
--- | Helper for comparing environment types
 teqEnv :: TyEnv -> TyEnv -> TyEnv -> TyEnv -> Bool
 teqEnv _ [] [] _ = True
 teqEnv g1 (Kind : e1) (Kind : e2) g2 =
@@ -139,46 +97,39 @@ value (Clos e _) = lvalue e
 value (TClos e _) = lvalue e
 value (FEnv e) = lvalue e
 value (Rec _ v) = value v
+value (EList es) = all value es  -- ADD THIS
 value _ = False
 
--- | Check if a closure environment is all values
 lvalue :: Env -> Bool
 lvalue [] = True
 lvalue (ExpE v : e) = lvalue e && value v
-lvalue (TypE (TyBoxT _ _) : e) =
-  lvalue e
+lvalue (TypE (TyBoxT _ _) : e) = lvalue e
 lvalue (TypE _ : _) = False
 
--- | Check if a label is in an environment type
 lbIn :: String -> Typ -> Bool
 lbIn l (TyEnvt (Type (TyRcd l' _) : _)) = l == l'
 lbIn l (TyEnvt (Type _ : g)) = lbIn l (TyEnvt g)
 lbIn l (TyEnvt (TypeEq _ : g)) = lbIn l (TyEnvt g)
 lbIn _ _ = False
 
--- | Wrapping
 wrapping :: TyEnv -> Typ -> Maybe Typ
 wrapping [] a = Just a
 wrapping (Type _ : g) a = wrapping g a
 wrapping (TypeEq c : g) a = wrapping g (TySubstT c a)
 wrapping (Kind : _) _ = Nothing
 
--- | Record label lookup in an environment
 rlk :: TyEnv -> String -> Maybe Typ
 rlk [] _ = Nothing
 rlk (Type (TyRcd l1 a) : g1) l
-  | l == l1 && not (lbIn l (TyEnvt g1)) = wrapping g1 a -- rlk_hit
-  | l /= l1 = rlk g1 l -- rlk_left
+  | l == l1 && not (lbIn l (TyEnvt g1)) = wrapping g1 a
+  | l /= l1 = rlk g1 l
   | otherwise = Nothing
 rlk (Type (TyEnvt t2) : g1) l
   | not (lbIn l (TyEnvt g1)) = wrapping g1 =<< rlk t2 l
   | otherwise = Nothing
-rlk (TypeEq _ : g1) l = rlk g1 l -- rlk_left_t
+rlk (TypeEq _ : g1) l = rlk g1 l
 rlk _ _ = Nothing
 
--- | Look up a term variable in an environment
---   Etvar/Eteq don't consume the index but require shifting
---   Evar consumes the index
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
@@ -187,7 +138,6 @@ getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
 -- | Infer the type of an expression
---   Returns Just typ if inference succeeds, Nothing otherwise
 infer :: TyEnv -> Exp -> Maybe Typ
 infer _ (Lit lit) = pure $ TyLit $ inferLit lit
   where
@@ -220,6 +170,10 @@ infer g (RProj e l) = do
   rlk g1 l
 infer g (Anno e t) =
   if check g e t then Just t else Nothing
+infer g (BinOp (Add e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyInt)
 infer g (BinOp (Sub e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))
@@ -238,25 +192,22 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
-infer _ (EList [])  = Nothing
-infer g (EList [e]) = do
-  t <- infer g e
-  return (TyList t)
+
+-- List inference
+infer g (EList []) = Nothing  -- Cannot infer empty list type
 infer g (EList (e:es)) = do
-  t   <- infer g e
-  ts  <- infer g (EList es)
-  case ts of
-    TyList t' -> if t == t' then return ts else Nothing
-    _ -> Nothing
-infer g (ETake _ es)  = do
-  ts <- infer g es
-  case ts of
-    TyList _ -> return ts
-    _ -> Nothing
-infer _ _ = Nothing -- Other cases cannot be inferred
+  t <- infer g e
+  -- Check all remaining elements have the same type
+  guard (all (\ei -> check g ei t) es)
+  return (TyList t)
+
+infer g (ETake _ e) = do
+  TyList t <- infer g e
+  return (TyList t)
+
+infer _ _ = Nothing
 
 -- | Check an expression against a type
---   Returns True if the expression has the given type
 check :: TyEnv -> Exp -> Typ -> Bool
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
 check g (TLam e) (TyAll a) = check (Kind : g) e a
@@ -270,9 +221,12 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
-check _ (EList []) (TyList _) = True
-check _ (EList []) _ = False
+
+-- List checking
+check _ (EList []) (TyList _) = True  -- Empty list checks against any list type
+check g (EList es) (TyList t) = all (\e -> check g e t) es
+
 check g e t =
   case infer g e of
-    Just t' -> teq g t' t g -- Use type equality
+    Just t' -> teq g t' t g
     _ -> False

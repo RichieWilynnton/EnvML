@@ -146,7 +146,7 @@ cmdDeBruijn :: FilePath -> IO ()
 cmdDeBruijn path = runPipeline path $ \ast -> do
   let coreNamed = elaborate ast
   let coreNameless = toDeBruijn coreNamed
-  putStrLn "=== De Bruijn CoreFE (Nameless) ==="
+  putStrLn "=== De Bruijn Core (Nameless) ==="
   putStrLn $ CoreFE.pretty coreNameless
 
 cmdCheck :: FilePath -> IO ()
