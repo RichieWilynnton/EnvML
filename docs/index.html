@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EnvML — First-Class Environments Playground</title>
+    <title>EnvML | CoreFE — First-Class Environments Playground</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -113,6 +113,37 @@
         }
 
         .mode-btn.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Display Mode Switcher ────────────────────────── */
+        .display-mode-switcher {
+            display: flex;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .display-mode-btn {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            padding: 5px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .display-mode-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-surface);
+        }
+
+        .display-mode-btn.active {
             background: var(--accent);
             color: #fff;
         }
@@ -420,7 +451,7 @@
 <body>
     <header>
         <div class="logo">
-            <h1>EnvML</h1>
+            <h1>EnvML | CoreFE</h1>
             <span>Playground</span>
         </div>
     </header>
@@ -452,7 +483,13 @@
 
         <section class="output-panel">
             <div class="panel-bar">
-                <span class="panel-label">Output</span>
+                <div class="panel-bar-left">
+                    <span class="panel-label">Output</span>
+                    <div class="display-mode-switcher">
+                        <button class="display-mode-btn active" id="display-detailed" onclick="setDisplayMode('detailed')">Detailed</button>
+                        <button class="display-mode-btn" id="display-simplified" onclick="setDisplayMode('simplified')">Simplified</button>
+                    </div>
+                </div>
                 <button class="btn" onclick="clearOutput()">Clear</button>
             </div>
             <div class="output-content" id="output">
@@ -671,28 +708,25 @@ let final = (result::(sig val id : a -> a; end)).id(1);`
 
 const coreExamples = [
   { id: "c1", label: "Polymorphic Identity",
-    code: `((Lam. lam. x0) @ Int) 42`
+    code: `((((Lam. lam. x0) : forall. 0 -> 0) @ Int) 42) : Int`
   },
   { id: "c2", label: "Closure + Capture",
-    code: `<[7] | lam. x0 ** x1> 6`
+    code: `((<[7] | lam. x0 ** x1> : [Int] |> Int -> Int) 6) : Int`
   },
   { id: "c3", label: "Env + Box Application",
-    code: `[{f = lam. x0 ** 10}, {x = 5}] |> ([x1].f [x0].x)`
+    code: `[{f = (lam. x0 ** 10) : Int -> Int }, { x = 5 : Int }] |> ([x1].f [x0].x) : Int`
   },
   { id: "c4", label: "Record via Env",
-    code: `[{greeting = "hello"}].greeting`
+    code: `([{greeting = "hello"}, {name = "Iron Man"}]: Env[{greeting : String}, {name : String}]).greeting`
   },
   { id: "c5", label: "Apply Twice",
-    code: `(lam. (x0) ((x0) 5)) (lam. x0 - 1)`
+    code: `((lam. (x0) (x0 5)): (Int -> Int) -> Int) ((lam. x0 - 1) : Int -> Int)`
   },
   { id: "c6", label: "Nested Env Projection",
-    code: `[{inner = [{val = 99}]}].inner.val`
+    code: `[{inner = [{val1 = 99}, {val2 = 100}]}].inner.val1`
   },
   { id: "c7", label: "Type Closure",
-    code: `(<[] | Lam. lam. x0> @ Int) 7`
-  },
-  { id: "c8", label: "Conditional Arithmetic",
-    code: `if 10 - 3 == 7 then 100 ** 2 else 0`
+    code: `((((<[] | Lam. lam. x0> : [] |>forall. 0 -> 0) : forall. 0 -> 0) @Int) : Int -> Int) 42`
   }
 ];
 
@@ -718,6 +752,7 @@ const coreStages = [
 // ═══════════════════════════════════════════════════════════════
 
 let currentMode = 'envml';
+let displayMode = 'detailed'; // 'detailed' or 'simplified'
 let wasmInstance = null;
 
 // ═══════════════════════════════════════════════════════════════
@@ -806,6 +841,17 @@ function setMode(mode) {
   }
 }
 
+function setDisplayMode(mode) {
+  displayMode = mode;
+  
+  // Update display mode buttons
+  document.getElementById('display-detailed').classList.toggle('active', mode === 'detailed');
+  document.getElementById('display-simplified').classList.toggle('active', mode === 'simplified');
+  
+  // Re-render stage buttons to update their function names
+  renderStageBar();
+}
+
 function populateExamples() {
   const sel = document.getElementById('exampleSelect');
   const examples = currentMode === 'envml' ? envmlExamples : coreExamples;
@@ -831,7 +877,9 @@ function renderStageBar() {
       const btn = document.createElement('button');
       btn.className = 'stage-btn' + (s.active ? ' active' : '');
       btn.textContent = s.label;
-      btn.onclick = () => runStage(s.func, s.label, btn);
+      // Append display mode suffix to function name
+      const funcName = s.func + (displayMode === 'detailed' ? 'Detailed' : 'Simplified');
+      btn.onclick = () => runStage(funcName, s.label, btn);
       bar.appendChild(btn);
     }
   });
@@ -971,6 +1019,7 @@ document.getElementById('exampleSelect').value = envmlExamples[0].id;
 updateHighlight();
 
 window.setMode = setMode;
+window.setDisplayMode = setDisplayMode;
 window.runStage = runStage;
 window.clearOutput = clearOutput;
 window.clearEditor = clearEditor;

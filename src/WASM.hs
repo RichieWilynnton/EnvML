@@ -47,41 +47,112 @@ toDeBruijn :: CoreNamed.Exp -> CoreFE.Exp
 toDeBruijn = DeBruijn.toDeBruijn
 
 -------------------------------------------------------------------------------
--- EnvML Pipeline Stages
+-- EnvML Pipeline Stages - DETAILED (using Pretty instances)
 -------------------------------------------------------------------------------
 
--- | Stage 1: Parse
-foreign export javascript "runParse" runParse :: JSString -> IO JSString
+-- | Stage 1: Parse (Detailed)
+foreign export javascript "runParseDetailed" runParseDetailed :: JSString -> IO JSString
 
-runParse :: JSString -> IO JSString
-runParse = safeRun $ \input ->
+runParseDetailed :: JSString -> IO JSString
+runParseDetailed = safeRun $ \input ->
+    let ast = parseModule input
+    in "=== Parsed AST ===\n\n" ++ AST.pretty ast
+
+-- | Stage 2: Elaborate (Detailed - Named CoreFE)
+foreign export javascript "runElaborateDetailed" runElaborateDetailed :: JSString -> IO JSString
+
+runElaborateDetailed :: JSString -> IO JSString
+runElaborateDetailed = safeRun $ \input ->
+    let ast       = parseModule input
+        coreNamed = elaborate ast
+    in "=== Elaborated (Named CoreFE) ===\n\n" ++ CoreNamed.pretty coreNamed
+
+-- | Stage 3: De Bruijn (Detailed - Nameless CoreFE)
+foreign export javascript "runDeBruijnDetailed" runDeBruijnDetailed :: JSString -> IO JSString
+
+runDeBruijnDetailed :: JSString -> IO JSString
+runDeBruijnDetailed = safeRun $ \input ->
+    let ast           = parseModule input
+        coreNamed     = elaborate ast
+        coreNameless  = toDeBruijn coreNamed
+    in "=== De Bruijn (Nameless CoreFE) ===\n\n" ++ CoreFE.pretty coreNameless
+
+-- | Stage 4: Type Check (Detailed)
+foreign export javascript "runCheckDetailed" runCheckDetailed :: JSString -> IO JSString
+
+runCheckDetailed :: JSString -> IO JSString
+runCheckDetailed = safeRun $ \input ->
+    let ast           = parseModule input
+        coreNamed     = elaborate ast
+        coreNameless  = toDeBruijn coreNamed
+    in case Check.infer [] coreNameless of
+        Nothing  -> "✗ Type Error\n\nCould not infer type"
+        Just typ -> "✓ Type Check Passed\n\n" ++ CoreFE.pretty typ
+
+-- | Stage 5: Eval (Detailed)
+foreign export javascript "runEvalDetailed" runEvalDetailed :: JSString -> IO JSString
+
+runEvalDetailed :: JSString -> IO JSString
+runEvalDetailed = safeRun $ \input ->
+    let ast           = parseModule input
+        coreNamed     = elaborate ast
+        coreNameless  = toDeBruijn coreNamed
+    in case Eval.eval [] coreNameless of
+        Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
+        Just res -> "✓ Evaluation Result\n\n" ++ CoreFE.pretty res
+
+-- | Full pipeline: check + eval (Detailed)
+foreign export javascript "runFullDetailed" runFullDetailed :: JSString -> IO JSString
+
+runFullDetailed :: JSString -> IO JSString
+runFullDetailed = safeRun $ \input ->
+    let ast           = parseModule input
+        coreNamed     = elaborate ast
+        coreNameless  = toDeBruijn coreNamed
+        typeResult = case Check.infer [] coreNameless of
+            Nothing  -> "✗ Type Error: Could not infer type"
+            Just typ -> "✓ Types:\n" ++ CoreFE.pretty typ
+        evalResult = case Eval.eval [] coreNameless of
+            Nothing  -> "✗ Evaluation Error: Got stuck"
+            Just res -> "✓ Values:\n" ++ CoreFE.pretty res
+    in typeResult ++ "\n\n" ++ evalResult
+
+-------------------------------------------------------------------------------
+-- EnvML Pipeline Stages - SIMPLIFIED (using PrettyWeb)
+-------------------------------------------------------------------------------
+
+-- | Stage 1: Parse (Simplified)
+foreign export javascript "runParseSimplified" runParseSimplified :: JSString -> IO JSString
+
+runParseSimplified :: JSString -> IO JSString
+runParseSimplified = safeRun $ \input ->
     let ast = parseModule input
     in "=== Parsed AST ===\n\n" ++ PW.prettyEnvMLModule ast
 
--- | Stage 2: Elaborate (Named CoreFE)
-foreign export javascript "runElaborate" runElaborate :: JSString -> IO JSString
+-- | Stage 2: Elaborate (Simplified)
+foreign export javascript "runElaborateSimplified" runElaborateSimplified :: JSString -> IO JSString
 
-runElaborate :: JSString -> IO JSString
-runElaborate = safeRun $ \input ->
+runElaborateSimplified :: JSString -> IO JSString
+runElaborateSimplified = safeRun $ \input ->
     let ast       = parseModule input
         coreNamed = elaborate ast
     in "=== Elaborated (Named CoreFE) ===\n\n" ++ PW.prettyNamedModule coreNamed
 
--- | Stage 3: De Bruijn (Nameless CoreFE)
-foreign export javascript "runDeBruijn" runDeBruijn :: JSString -> IO JSString
+-- | Stage 3: De Bruijn (Simplified)
+foreign export javascript "runDeBruijnSimplified" runDeBruijnSimplified :: JSString -> IO JSString
 
-runDeBruijn :: JSString -> IO JSString
-runDeBruijn = safeRun $ \input ->
+runDeBruijnSimplified :: JSString -> IO JSString
+runDeBruijnSimplified = safeRun $ \input ->
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
     in "=== De Bruijn (Nameless CoreFE) ===\n\n" ++ PW.prettyDeBruijnModule coreNameless
 
--- | Stage 4: Type Check
-foreign export javascript "runCheck" runCheck :: JSString -> IO JSString
+-- | Stage 4: Type Check (Simplified)
+foreign export javascript "runCheckSimplified" runCheckSimplified :: JSString -> IO JSString
 
-runCheck :: JSString -> IO JSString
-runCheck = safeRun $ \input ->
+runCheckSimplified :: JSString -> IO JSString
+runCheckSimplified = safeRun $ \input ->
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
@@ -89,11 +160,11 @@ runCheck = safeRun $ \input ->
         Nothing  -> "✗ Type Error\n\nCould not infer type"
         Just typ -> "✓ Type Check Passed\n\n" ++ PW.prettyCheckResult typ
 
--- | Stage 5: Eval
-foreign export javascript "runEval" runEval :: JSString -> IO JSString
+-- | Stage 5: Eval (Simplified)
+foreign export javascript "runEvalSimplified" runEvalSimplified :: JSString -> IO JSString
 
-runEval :: JSString -> IO JSString
-runEval = safeRun $ \input ->
+runEvalSimplified :: JSString -> IO JSString
+runEvalSimplified = safeRun $ \input ->
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
@@ -101,11 +172,11 @@ runEval = safeRun $ \input ->
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Evaluation Result\n\n" ++ PW.prettyEvalResult res
 
--- | Full pipeline: check + eval
-foreign export javascript "runFull" runFull :: JSString -> IO JSString
+-- | Full pipeline: check + eval (Simplified)
+foreign export javascript "runFullSimplified" runFullSimplified :: JSString -> IO JSString
 
-runFull :: JSString -> IO JSString
-runFull = safeRun $ \input ->
+runFullSimplified :: JSString -> IO JSString
+runFullSimplified = safeRun $ \input ->
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
@@ -118,42 +189,124 @@ runFull = safeRun $ \input ->
     in typeResult ++ "\n" ++ evalResult
 
 -------------------------------------------------------------------------------
--- CoreFE Calculus Direct Functions
+-- CoreFE Calculus Direct Functions - DETAILED
 -------------------------------------------------------------------------------
 
--- | Parse a CoreFE expression string
-foreign export javascript "coreParseExp" coreParseExp :: JSString -> IO JSString
+-- | Parse a CoreFE expression string (Detailed)
+foreign export javascript "coreParseExpDetailed" coreParseExpDetailed :: JSString -> IO JSString
 
-coreParseExp :: JSString -> IO JSString
-coreParseExp = safeRun $ \input ->
+coreParseExpDetailed :: JSString -> IO JSString
+coreParseExpDetailed = safeRun $ \input ->
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
     in "=== Parsed CoreFE ===\n\n" ++ CoreFE.pretty expr
 
--- | Parse + Infer type of a CoreFE expression
-foreign export javascript "coreCheck" coreCheck :: JSString -> IO JSString
+-- | Parse + Infer type of a CoreFE expression (Detailed)
+foreign export javascript "coreCheckDetailed" coreCheckDetailed :: JSString -> IO JSString
 
-coreCheck :: JSString -> IO JSString
-coreCheck = safeRun $ \input ->
+coreCheckDetailed :: JSString -> IO JSString
+coreCheckDetailed = safeRun $ \input ->
+    let expr = CoreParser.parseExp (CoreLexer.lexer input)
+    in case Check.infer [] expr of
+        Nothing  -> "✗ Type Error\n\nCould not infer type"
+        Just typ -> "✓ Type\n\n  " ++ CoreFE.pretty typ
+
+-- | Parse + Eval a CoreFE expression (Detailed)
+foreign export javascript "coreEvalDetailed" coreEvalDetailed :: JSString -> IO JSString
+
+coreEvalDetailed :: JSString -> IO JSString
+coreEvalDetailed = safeRun $ \input ->
+    let expr = CoreParser.parseExp (CoreLexer.lexer input)
+    in case Eval.eval [] expr of
+        Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
+        Just res -> "✓ Result\n\n  " ++ CoreFE.pretty res
+
+-- | Parse + Check + Eval a CoreFE expression (Detailed)
+foreign export javascript "coreRunDetailed" coreRunDetailed :: JSString -> IO JSString
+
+coreRunDetailed :: JSString -> IO JSString
+coreRunDetailed = safeRun $ \input ->
+    let expr = CoreParser.parseExp (CoreLexer.lexer input)
+        typeStr = case Check.infer [] expr of
+            Nothing  -> "✗ Type Error: Could not infer type"
+            Just typ -> "Type   : " ++ CoreFE.pretty typ
+        evalStr = case Eval.eval [] expr of
+            Nothing  -> "✗ Eval Error: Got stuck"
+            Just res -> "Result : " ++ CoreFE.pretty res
+    in typeStr ++ "\n" ++ evalStr
+
+-------------------------------------------------------------------------------
+-- CoreFE Calculus Direct Functions - SIMPLIFIED
+-------------------------------------------------------------------------------
+
+-- | Parse a CoreFE expression string (Simplified)
+foreign export javascript "coreParseExpSimplified" coreParseExpSimplified :: JSString -> IO JSString
+
+coreParseExpSimplified :: JSString -> IO JSString
+coreParseExpSimplified = safeRun $ \input ->
+    let expr = CoreParser.parseExp (CoreLexer.lexer input)
+    in "=== Parsed CoreFE ===\n\n" ++ CoreFE.pretty expr
+
+-------------------------------------------------------------------------------
+-- Legacy function names (for backward compatibility)
+-------------------------------------------------------------------------------
+
+-- EnvML stages (default to Simplified)
+foreign export javascript "runParse" runParse :: JSString -> IO JSString
+runParse = runParseSimplified
+
+foreign export javascript "runElaborate" runElaborate :: JSString -> IO JSString
+runElaborate = runElaborateSimplified
+
+foreign export javascript "runDeBruijn" runDeBruijn :: JSString -> IO JSString
+runDeBruijn = runDeBruijnSimplified
+
+foreign export javascript "runCheck" runCheck :: JSString -> IO JSString
+runCheck = runCheckSimplified
+
+foreign export javascript "runEval" runEval :: JSString -> IO JSString
+runEval = runEvalSimplified
+
+foreign export javascript "runFull" runFull :: JSString -> IO JSString
+runFull = runFullSimplified
+
+-- CoreFE stages (default to Simplified)
+foreign export javascript "coreParseExp" coreParseExp :: JSString -> IO JSString
+coreParseExp = coreParseExpSimplified
+
+foreign export javascript "coreCheck" coreCheck :: JSString -> IO JSString
+coreCheck = coreCheckSimplified
+
+foreign export javascript "coreEval" coreEval :: JSString -> IO JSString
+coreEval = coreEvalSimplified
+
+foreign export javascript "coreRun" coreRun :: JSString -> IO JSString
+coreRun = coreRunSimplified
+
+-- | Parse + Infer type of a CoreFE expression (Simplified)
+foreign export javascript "coreCheckSimplified" coreCheckSimplified :: JSString -> IO JSString
+
+coreCheckSimplified :: JSString -> IO JSString
+coreCheckSimplified = safeRun $ \input ->
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
     in case Check.infer [] expr of
         Nothing  -> "✗ Type Error\n\nCould not infer type"
         Just typ -> "✓ Type\n\n  " ++ PW.prettyDeBruijnTyp typ
 
--- | Parse + Eval a CoreFE expression
-foreign export javascript "coreEval" coreEval :: JSString -> IO JSString
+-- | Parse + Eval a CoreFE expression (Simplified)
+foreign export javascript "coreEvalSimplified" coreEvalSimplified :: JSString -> IO JSString
 
-coreEval :: JSString -> IO JSString
-coreEval = safeRun $ \input ->
+coreEvalSimplified :: JSString -> IO JSString
+coreEvalSimplified = safeRun $ \input ->
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
     in case Eval.eval [] expr of
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Result\n\n  " ++ PW.prettyValueShort res
 
--- | Parse + Check + Eval a CoreFE expression (full pipeline)
-foreign export javascript "coreRun" coreRun :: JSString -> IO JSString
+-- | Parse + Check + Eval a CoreFE expression (Simplified)
+foreign export javascript "coreRunSimplified" coreRunSimplified :: JSString -> IO JSString
 
-coreRun :: JSString -> IO JSString
-coreRun = safeRun $ \input ->
+coreRunSimplified :: JSString -> IO JSString
+coreRunSimplified = safeRun $ \input ->
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
         typeStr = case Check.infer [] expr of
             Nothing  -> "✗ Type Error: Could not infer type"
@@ -162,6 +315,10 @@ coreRun = safeRun $ \input ->
             Nothing  -> "✗ Eval Error: Got stuck"
             Just res -> "Result : " ++ PW.prettyValueShort res
     in typeStr ++ "\n" ++ evalStr
+
+-------------------------------------------------------------------------------
+-- Helper
+-------------------------------------------------------------------------------
 
 safeRun :: (String -> String) -> JSString -> IO JSString
 safeRun f input = do
