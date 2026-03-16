@@ -1,4 +1,3 @@
-import Lean
 
 namespace SCE
 
@@ -67,7 +66,6 @@ inductive LabelIn : String -> Typ -> Prop
 | rcd (label : String) (T : Typ) : LabelIn label (Typ.rcd label T)
 | andl (A B : Typ) (label : String) : LabelIn label A → LabelIn label (Typ.and A B)
 | andr (A B : Typ) (label : String) : LabelIn label B → LabelIn label (Typ.and A B)
-
 
 inductive RecordLookup : Typ → String → Typ → Prop
 | zero (label : String) (T : Typ) :
