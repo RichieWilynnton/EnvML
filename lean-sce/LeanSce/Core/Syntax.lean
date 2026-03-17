@@ -75,22 +75,28 @@ inductive Value : Exp → Prop where
   | vrcd {v l}    : Value v → Value (.lrec l v)
   | vmrg {v1 v2}  : Value v1 → Value v2 → Value (.mrg v1 v2)
 
-inductive IndexLookup : Typ → Nat → Typ → Prop where
-  | zero {A B}      : IndexLookup (.and A B) 0 B
-  | succ {A n C B}  : IndexLookup A n C → IndexLookup (.and A B) (n+1) C
+inductive Lookup : Typ → Nat → Typ → Prop where
+  | zero {A B}
+    : Lookup (.and A B) 0 B
+  | succ {A n C B}
+    : Lookup A n C
+    → Lookup (.and A B) (n+1) C
 
-inductive LabelIn : String → Typ → Prop where
-  | rcd {l A}     : LabelIn l (.rcd l A)
-  | andl {l A B}  : LabelIn l A → LabelIn l (.and A B)
-  | andr {l B A}  : LabelIn l B → LabelIn l (.and A B)
+inductive Lin : String → Typ → Prop where
+  | rcd {l A}     : Lin l (.rcd l A)
+  | andl {l A B}  : Lin l A → Lin l (.and A B)
+  | andr {l B A}  : Lin l B → Lin l (.and A B)
 
-inductive RecordLookup : Typ → String → Typ → Prop where
-  | zero {l A}      : RecordLookup (.rcd l A) l A
-  | andl {A l C B}  : RecordLookup A l C
-         → LabelIn l A ∧ ¬LabelIn l B
-         → RecordLookup (.and A B) l C
-  | andr {B l C A}  : RecordLookup B l C
-         → ¬LabelIn l A ∧ LabelIn l B
-         → RecordLookup (.and A B) l C
+inductive RLookup : Typ → String → Typ → Prop where
+  | zero {l A}
+    : RLookup (.rcd l A) l A
+  | landl {A l C B}
+    : RLookup A l C
+      → Lin l A ∧ ¬Lin l B
+      → RLookup (.and A B) l C
+  | landr {B l C A}
+    : RLookup B l C
+      → ¬Lin l A ∧ Lin l B
+      → RLookup (.and A B) l C
 
 end Core
