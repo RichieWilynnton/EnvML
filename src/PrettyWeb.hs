@@ -99,7 +99,7 @@ prettyNamedBindingExp name e =
 prettyNamedExpShort :: Named.Exp -> String
 prettyNamedExpShort (Named.Lit l) = prettyLiteral l
 prettyNamedExpShort (Named.Var n) = n
-prettyNamedExpShort (Named.Fix _) = "fix ..."
+prettyNamedExpShort (Named.Fix n _) = "fix " ++ n ++ ". ..."
 prettyNamedExpShort (Named.If _ _ _) = "if ... then ... else ..."
 prettyNamedExpShort (Named.Lam n _) = "λ" ++ n ++ ". ..."
 prettyNamedExpShort (Named.TLam n _) = "Λ" ++ n ++ ". ..."

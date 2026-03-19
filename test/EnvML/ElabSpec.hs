@@ -98,6 +98,13 @@ spec = do
       let named = elabExp parsed
       named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt)
 
+    it "elaborates named fixpoint" $ do
+      let input = "fix f. fun (x : int) -> f(x)"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.Fix "f" (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
+
   describe "Elaborate Binary Operators" $ do
 
     it "elaborates comparison operators" $ do
@@ -206,3 +213,13 @@ spec = do
           (CoreFE.Lit (CoreFE.LitBool True))
           (CoreFE.Lit (CoreFE.LitInt 1))
           (CoreFE.Lit (CoreFE.LitInt 0))
+
+    it "converts named fixpoint with recursive reference" $ do
+      let named =
+            Named.Fix "f"
+              (Named.Lam "x" (Named.App (Named.Var "f") (Named.Var "x")))
+      let nameless = DB.toDeBruijn named
+      nameless `shouldBe`
+        CoreFE.Fix
+          (CoreFE.Lam
+            (CoreFE.App (CoreFE.Var 1) (CoreFE.Var 0)))

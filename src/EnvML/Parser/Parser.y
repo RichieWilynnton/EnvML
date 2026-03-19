@@ -125,7 +125,7 @@ IntfE :: { IntfE }
 
 Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }
-  | fix Exp                               { Fix $2 }
+  | fix id '.' Exp                        { Fix $2 $4 }
   | if Exp then Exp else Exp              { If $2 $4 $6 }
   | clos '[' Env ']' FunArgs '->' Exp     { Clos $3 $5 $7 }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }

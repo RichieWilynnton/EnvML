@@ -1,5 +1,5 @@
-let zeroRec : int -> int =
-	fix fun (x : int) -> 
-    (if x == 0 then 0 else zeroRec(x - 1));
+let fact : int -> int -> int =
+	fun (ff) -> fix f. fun (x : int) -> 
+    (if x == 1 then 1 else x * f(x - 1));
 
-let result : int = idRec(42);
+let result : int = fact(2)(4);

@@ -85,7 +85,7 @@ data EnvE
 data Exp
   = Lit   CoreFE.Literal    -- Literals: int, double, bool, string
   | Var   Name              -- Var x, y, hello
-  | Fix   Exp               -- fix e
+  | Fix   Name Exp          -- fix f. e
   | If    Exp Exp Exp       -- if e1 then e2 else e3
   | Lam   FunArgs Exp       -- fun (x: A) (y : B) -> x + 1
   | TLam  FunArgs Exp       -- fun 
@@ -139,7 +139,7 @@ expPrec e = case e of
   Box _ _   -> 1
   Clos {}   -> 1
   TClos {}  -> 1
-  Fix _     -> 2
+  Fix _ _   -> 2
   Lam {}    -> 2
   App _ _   -> 3
   TApp _ _  -> 3
@@ -325,8 +325,8 @@ prettyModule (MAnno m1 mty) =
 prettyExp :: Exp -> String
 prettyExp (Lit l) = CoreFE.pretty l
 prettyExp (Var n) = n
-prettyExp (Fix e) =
-  "fix " ++ parensIf (expPrec e < expPrec (Fix e)) (prettyExp e)
+prettyExp (Fix n e) =
+  "fix " ++ n ++ ". " ++ parensIf (expPrec e < expPrec (Fix n e)) (prettyExp e)
 prettyExp (If e1 e2 e3) =
   "if " ++ prettyExp e1 ++ " then " ++ prettyExp e2 ++ " else " ++ prettyExp e3
 prettyExp (Lam args e) = 

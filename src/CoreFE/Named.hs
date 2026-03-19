@@ -16,7 +16,7 @@ data EnvE
 data Exp
   = Lit   Nameless.Literal
   | Var   Name
-  | Fix   Exp
+  | Fix   Name Exp
   | If    Exp Exp Exp
   | BinOp BinOp
   | Lam   Name Exp
@@ -126,7 +126,7 @@ prettyTyEnvE (TypeEq n t) = "type " ++ n ++ " = " ++ prettyTyp t
 prettyExp :: Exp -> String
 prettyExp (Lit l) = prettyLit l
 prettyExp (Var n) = n
-prettyExp (Fix e) = "fix " ++ parenIf (needsParenExp e) (prettyExp e)
+prettyExp (Fix n e) = "fix " ++ n ++ ". " ++ parenIf (needsParenExp e) (prettyExp e)
 prettyExp (If e1 e2 e3) =
   "if " ++ prettyExp e1 ++ " then " ++ prettyExp e2 ++ " else " ++ prettyExp e3
 prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
@@ -166,7 +166,7 @@ needsParenExp (App _ _) = True
 needsParenExp (TApp _ _) = True
 needsParenExp (Lam _ _) = True
 needsParenExp (TLam _ _) = True
-needsParenExp (Fix _) = True
+needsParenExp (Fix _ _) = True
 needsParenExp (If _ _ _) = True
 needsParenExp (BinOp _) = True
 needsParenExp (Anno _ _) = True
