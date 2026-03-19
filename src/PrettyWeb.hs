@@ -112,6 +112,7 @@ prettyNamedExpShort (Named.Rec l e) = "{" ++ l ++ " = " ++ prettyNamedExpShort e
 prettyNamedExpShort (Named.RProj e l) = prettyNamedExpShort e ++ "." ++ l
 prettyNamedExpShort (Named.FEnv env) = prettyNamedEnvShort env
 prettyNamedExpShort (Named.Anno e _) = prettyNamedExpShort e
+prettyNamedExpShort (Named.BinOp _) = "..."
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
 
@@ -176,6 +177,11 @@ prettyDeBruijnBinOpShort (CoreFE.Add e1 e2) = prettyDeBruijnExpShort e1 ++ " + "
 prettyDeBruijnBinOpShort (CoreFE.Sub e1 e2) = prettyDeBruijnExpShort e1 ++ " - " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.Mul e1 e2) = prettyDeBruijnExpShort e1 ++ " * " ++ prettyDeBruijnExpShort e2
 prettyDeBruijnBinOpShort (CoreFE.EqEq e1 e2) = prettyDeBruijnExpShort e1 ++ " == " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Neq e1 e2) = prettyDeBruijnExpShort e1 ++ " != " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Lt e1 e2) = prettyDeBruijnExpShort e1 ++ " < " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Le e1 e2) = prettyDeBruijnExpShort e1 ++ " <= " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Gt e1 e2) = prettyDeBruijnExpShort e1 ++ " > " ++ prettyDeBruijnExpShort e2
+prettyDeBruijnBinOpShort (CoreFE.Ge e1 e2) = prettyDeBruijnExpShort e1 ++ " >= " ++ prettyDeBruijnExpShort e2
 
 prettyDeBruijnEnvShort :: CoreFE.Env -> String
 prettyDeBruijnEnvShort [] = "[]"
@@ -221,6 +227,11 @@ prettyDeBruijnBinOp (CoreFE.Add e1 e2) = prettyDeBruijnExp e1 ++ " + " ++ pretty
 prettyDeBruijnBinOp (CoreFE.Sub e1 e2) = prettyDeBruijnExp e1 ++ " - " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.Mul e1 e2) = prettyDeBruijnExp e1 ++ " * " ++ prettyDeBruijnExp e2
 prettyDeBruijnBinOp (CoreFE.EqEq e1 e2) = prettyDeBruijnExp e1 ++ " == " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Neq e1 e2) = prettyDeBruijnExp e1 ++ " != " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Lt e1 e2) = prettyDeBruijnExp e1 ++ " < " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Le e1 e2) = prettyDeBruijnExp e1 ++ " <= " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Gt e1 e2) = prettyDeBruijnExp e1 ++ " > " ++ prettyDeBruijnExp e2
+prettyDeBruijnBinOp (CoreFE.Ge e1 e2) = prettyDeBruijnExp e1 ++ " >= " ++ prettyDeBruijnExp e2
 
 prettyDeBruijnEnv :: CoreFE.Env -> String
 prettyDeBruijnEnv [] = ""

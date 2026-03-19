@@ -11,7 +11,7 @@ import CoreFE.Syntax
 %tokentype { Token }
 %error { parseError }
 
-%expect 1
+%expect 2
 
 %token
   int_kw    { TokInt }
@@ -50,12 +50,15 @@ import CoreFE.Syntax
   '@'       { TokAt }
   '='       { TokEquals }       -- record assignment
   '=='      { TokEqOp }         -- equality check
+  '!='      { TokNeqOp }
+  '<='      { TokLeOp }
+  '>='      { TokGeOp }
   '|'       { TokBar }
   '-'       { TokSub }
   '**'      { TokMul }          -- using ** to avoid confusion with * (Kind)
 
 %right '->'
-%nonassoc '=='
+%nonassoc '==' '!=' '<' '<=' '>' '>='
 %left '-'
 %left '**'
 %left '.'
@@ -70,6 +73,11 @@ Exp :: { Exp }
   | fix Exp                             { Fix $2 }
   | AppExp ':' Typ                      { Anno $1 $3 }
   | AppExp '==' AppExp                  { BinOp (EqEq $1 $3) }
+  | AppExp '!=' AppExp                  { BinOp (Neq $1 $3) }
+  | AppExp '<' AppExp                   { BinOp (Lt $1 $3) }
+  | AppExp '<=' AppExp                  { BinOp (Le $1 $3) }
+  | AppExp '>' AppExp                   { BinOp (Gt $1 $3) }
+  | AppExp '>=' AppExp                  { BinOp (Ge $1 $3) }
   | AppExp '-' AppExp                   { BinOp (Sub $1 $3) }
   | AppExp '**' AppExp                  { BinOp (Mul $1 $3) }
   | AppExp                              { $1 }

@@ -111,6 +111,11 @@ data BinOp
   | Sub   Exp Exp
   | Mul   Exp Exp
   | EqEq  Exp Exp
+  | Neq   Exp Exp
+  | Lt    Exp Exp
+  | Le    Exp Exp
+  | Gt    Exp Exp
+  | Ge    Exp Exp
   deriving (Eq, Show)
 
 type Precedence = Int
@@ -361,3 +366,8 @@ prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
 prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
 prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
 prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (Neq e1 e2)) = prettyExp e1 ++ " != " ++ prettyExp e2
+prettyExp (BinOp (Lt e1 e2)) = prettyExp e1 ++ " < " ++ prettyExp e2
+prettyExp (BinOp (Le e1 e2)) = prettyExp e1 ++ " <= " ++ prettyExp e2
+prettyExp (BinOp (Gt e1 e2)) = prettyExp e1 ++ " > " ++ prettyExp e2
+prettyExp (BinOp (Ge e1 e2)) = prettyExp e1 ++ " >= " ++ prettyExp e2

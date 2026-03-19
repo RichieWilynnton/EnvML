@@ -90,6 +90,26 @@ eval env = go
         v1 <- eval env e1
         v2 <- eval env e2
         pure $ Lit (LitBool (v1 == v2))
+    go (BinOp (Neq e1 e2)) = do
+      v1 <- eval env e1
+      v2 <- eval env e2
+      pure $ Lit (LitBool (v1 /= v2))
+    go (BinOp (Lt e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 < v2))
+    go (BinOp (Le e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 <= v2))
+    go (BinOp (Gt e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 > v2))
+    go (BinOp (Ge e1 e2)) = do
+      Lit (LitInt v1) <- eval env e1
+      Lit (LitInt v2) <- eval env e2
+      pure $ Lit (LitBool (v1 >= v2))
     go (EList es) = do
         vs <- mapM (eval env) es
         pure $ EList vs

@@ -45,6 +45,10 @@ tokens :-
   List        { \_ -> TokListE }
 
   -- Symbols
+  "=="        { \_ -> TokEqEq     }
+  "!="        { \_ -> TokNeq      }
+  "<="        { \_ -> TokLe       }
+  ">="        { \_ -> TokGe       }
   "="         { \_ -> TokEq       }
   ":"         { \_ -> TokColon    }
   ":="        { \_ -> TokColonEqual    }
@@ -120,6 +124,10 @@ data Token
   | TokRBrace   
   | TokLAngle
   | TokRAngle
+  | TokEqEq
+  | TokNeq
+  | TokLe
+  | TokGe
   | TokComma    
   | TokDot
   | TokSemi

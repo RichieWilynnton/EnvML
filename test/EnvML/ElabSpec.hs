@@ -98,6 +98,24 @@ spec = do
       let named = elabExp parsed
       named `shouldBe` Named.TApp (Named.Var "f") (Named.TyLit CoreFE.TyInt)
 
+  describe "Elaborate Binary Operators" $ do
+
+    it "elaborates comparison operators" $ do
+      let input = "1 <= 2"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe`
+        Named.BinOp
+          (Named.Le
+            (Named.Lit (CoreFE.LitInt 1))
+            (Named.Lit (CoreFE.LitInt 2)))
+
+    it "elaborates inequality operator" $ do
+      let input = "x != y"
+      let parsed = parseExp (lexer input)
+      let named = elabExp parsed
+      named `shouldBe` Named.BinOp (Named.Neq (Named.Var "x") (Named.Var "y"))
+
   describe "Elaborate Types" $ do
     
     it "elaborates type literals" $ do

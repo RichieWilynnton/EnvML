@@ -197,6 +197,26 @@ infer g (BinOp (EqEq e1 e2)) = do
   t1 <- infer g e1
   guard (check g e2 t1)
   return (TyLit TyBool)
+infer g (BinOp (Neq e1 e2)) = do
+  t1 <- infer g e1
+  guard (check g e2 t1)
+  return (TyLit TyBool)
+infer g (BinOp (Lt e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Le e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Gt e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
+infer g (BinOp (Ge e1 e2)) = do
+  guard (check g e1 (TyLit TyInt))
+  guard (check g e2 (TyLit TyInt))
+  return (TyLit TyBool)
 
 -- List inference
 infer _ (EList []) = Nothing -- Cannot infer empty list type

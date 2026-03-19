@@ -105,6 +105,26 @@ evalTests =
     , "1 == 2"
     , Just (Lit (LitBool False))
     )
+  , ( "inequality true"
+    , "1 != 2"
+    , Just (Lit (LitBool True))
+    )
+  , ( "less than"
+    , "1 < 2"
+    , Just (Lit (LitBool True))
+    )
+  , ( "less than or equal"
+    , "2 <= 2"
+    , Just (Lit (LitBool True))
+    )
+  , ( "greater than"
+    , "3 > 2"
+    , Just (Lit (LitBool True))
+    )
+  , ( "greater than or equal"
+    , "3 >= 3"
+    , Just (Lit (LitBool True))
+    )
   , ( "if-then-else true branch"
     , "if true then 1 else 0"
     , Just (Lit (LitInt 1))
@@ -264,6 +284,16 @@ checkTests =
   , ( "annotated expression"
     , "42 : Int"
     , "Int"
+    , True
+    )
+  , ( "less-than returns Bool"
+    , "1 < 2"
+    , "Bool"
+    , True
+    )
+  , ( "greater-than-or-equal returns Bool"
+    , "3 >= 2"
+    , "Bool"
     , True
     )
   , ( "empty closure checks as box arrow"

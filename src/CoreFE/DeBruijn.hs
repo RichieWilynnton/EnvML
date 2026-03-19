@@ -43,6 +43,51 @@ toNamelessExp eNames tNames e =
         (toNamelessExp eNames tNames e1)
         (toNamelessExp eNames tNames e2)
         (toNamelessExp eNames tNames e3)
+    (Named.BinOp (Named.Add e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Add
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Sub e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Sub
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Mul e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Mul
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.EqEq e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.EqEq
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Neq e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Neq
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Lt e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Lt
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Le e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Le
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Gt e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Gt
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
+    (Named.BinOp (Named.Ge e1 e2)) ->
+      Nameless.BinOp
+        (Nameless.Ge
+          (toNamelessExp eNames tNames e1)
+          (toNamelessExp eNames tNames e2))
     (Named.Lam x e1) ->
       Nameless.Lam (toNamelessExp ((x, TermBinding):eNames) tNames e1)
     (Named.Clos env e1)  ->

@@ -66,12 +66,19 @@ import qualified CoreFE.Syntax as CoreFE
   '}'       { TokRBrace }
   '<'       { TokLAngle }
   '>'       { TokRAngle }
+  '=='      { TokEqEq }
+  '!='      { TokNeq }
+  '<='      { TokLe }
+  '>='      { TokGe }
   '+'       { TokPlus   }
   '-'       { TokDash   }
   '*'       { TokStar   }
 
 %right '->'
 %right '->m'
+%nonassoc '==' '!=' '<' '<=' '>' '>='
+%left '+' '-'
+%left '*'
 
 %%
 
@@ -124,6 +131,12 @@ Exp :: { Exp }
   | tclos '[' Env ']' FunArgs '->' Exp    { TClos $3 $5 $7 }
   | box '[' Env ']' in Exp                { Box $3 $6 }
   | Term '::' Typ                         { Anno $1 $3 }
+  | Exp '==' Exp                          { BinOp (EqEq $1 $3) }
+  | Exp '!=' Exp                          { BinOp (Neq $1 $3) }
+  | Exp '<' Exp                           { BinOp (Lt $1 $3) }
+  | Exp '<=' Exp                          { BinOp (Le $1 $3) }
+  | Exp '>' Exp                           { BinOp (Gt $1 $3) }
+  | Exp '>=' Exp                          { BinOp (Ge $1 $3) }
   | Exp '+' Exp                           { BinOp (Add $1 $3) }
   | Exp '-' Exp                           { BinOp (Sub $1 $3) }
   | Exp '*' Exp                           { BinOp (Mul $1 $3) }

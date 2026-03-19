@@ -18,6 +18,7 @@ data Exp
   | Var   Name
   | Fix   Exp
   | If    Exp Exp Exp
+  | BinOp BinOp
   | Lam   Name Exp
   | Clos  Env Exp
   | App   Exp Exp
@@ -32,6 +33,18 @@ data Exp
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
+  deriving (Eq, Show)
+
+data BinOp
+  = Add   Exp Exp
+  | Sub   Exp Exp
+  | Mul   Exp Exp
+  | EqEq  Exp Exp
+  | Neq   Exp Exp
+  | Lt    Exp Exp
+  | Le    Exp Exp
+  | Gt    Exp Exp
+  | Ge    Exp Exp
   deriving (Eq, Show)
 
 type TyEnv = [TyEnvE]
@@ -116,6 +129,15 @@ prettyExp (Var n) = n
 prettyExp (Fix e) = "fix " ++ parenIf (needsParenExp e) (prettyExp e)
 prettyExp (If e1 e2 e3) =
   "if " ++ prettyExp e1 ++ " then " ++ prettyExp e2 ++ " else " ++ prettyExp e3
+prettyExp (BinOp (Add e1 e2)) = prettyExp e1 ++ " + " ++ prettyExp e2
+prettyExp (BinOp (Sub e1 e2)) = prettyExp e1 ++ " - " ++ prettyExp e2
+prettyExp (BinOp (Mul e1 e2)) = prettyExp e1 ++ " * " ++ prettyExp e2
+prettyExp (BinOp (EqEq e1 e2)) = prettyExp e1 ++ " == " ++ prettyExp e2
+prettyExp (BinOp (Neq e1 e2)) = prettyExp e1 ++ " != " ++ prettyExp e2
+prettyExp (BinOp (Lt e1 e2)) = prettyExp e1 ++ " < " ++ prettyExp e2
+prettyExp (BinOp (Le e1 e2)) = prettyExp e1 ++ " <= " ++ prettyExp e2
+prettyExp (BinOp (Gt e1 e2)) = prettyExp e1 ++ " > " ++ prettyExp e2
+prettyExp (BinOp (Ge e1 e2)) = prettyExp e1 ++ " >= " ++ prettyExp e2
 prettyExp (Lam n e) = "λ" ++ n ++ ". " ++ prettyExp e
 prettyExp (TLam n e) = "Λ" ++ n ++ ". " ++ prettyExp e
 prettyExp (Clos env e) = 
@@ -146,6 +168,7 @@ needsParenExp (Lam _ _) = True
 needsParenExp (TLam _ _) = True
 needsParenExp (Fix _) = True
 needsParenExp (If _ _ _) = True
+needsParenExp (BinOp _) = True
 needsParenExp (Anno _ _) = True
 needsParenExp _ = False
 

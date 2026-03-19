@@ -54,6 +54,9 @@ tokens :-
   "@"                           { \_ -> TokAt }
   "="                           { \_ -> TokEquals }
   "=="                          { \_ -> TokEqOp }
+  "!="                          { \_ -> TokNeqOp }
+  "<="                          { \_ -> TokLeOp }
+  ">="                          { \_ -> TokGeOp }
   "|"                           { \_ -> TokBar }
   "-"                           { \_ -> TokSub }
   "**"                          { \_ -> TokMul }
@@ -100,6 +103,9 @@ data Token
   | TokAt
   | TokEquals
   | TokEqOp
+  | TokNeqOp
+  | TokLeOp
+  | TokGeOp
   | TokBar
   | TokSub
   | TokMul

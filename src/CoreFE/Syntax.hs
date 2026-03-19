@@ -59,6 +59,11 @@ data BinOp
   | Sub   Exp Exp
   | Mul   Exp Exp
   | EqEq  Exp Exp
+  | Neq   Exp Exp
+  | Lt    Exp Exp
+  | Le    Exp Exp
+  | Gt    Exp Exp
+  | Ge    Exp Exp
   deriving (Eq, Show)
 
 data Literal
@@ -289,6 +294,26 @@ stringOfBinOpI lvl op@(EqEq e1 e2) =
     let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
         s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
      in s1 ++ " == " ++ s2
+stringOfBinOpI lvl op@(Neq e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " != " ++ s2
+stringOfBinOpI lvl op@(Lt e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " < " ++ s2
+stringOfBinOpI lvl op@(Le e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " <= " ++ s2
+stringOfBinOpI lvl op@(Gt e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " > " ++ s2
+stringOfBinOpI lvl op@(Ge e1 e2) =
+    let s1 = parensIf (expPrec e1 < binOpPrec op) (stringOfExpI lvl e1)
+        s2 = parensIf (expPrec e2 <= binOpPrec op) (stringOfExpI lvl e2)
+     in s1 ++ " >= " ++ s2
 
 stringOfLiteral :: Literal -> String
 stringOfLiteral (LitInt n)  = show n
@@ -320,6 +345,11 @@ binOpPrec (Mul _ _)  = 7
 binOpPrec (Add _ _)  = 6
 binOpPrec (Sub _ _)  = 6
 binOpPrec (EqEq _ _) = 5
+binOpPrec (Neq _ _)  = 5
+binOpPrec (Lt _ _)   = 5
+binOpPrec (Le _ _)   = 5
+binOpPrec (Gt _ _)   = 5
+binOpPrec (Ge _ _)   = 5
 
 stringOfList :: (a -> String) -> [a] -> String
 stringOfList _ [] = ""

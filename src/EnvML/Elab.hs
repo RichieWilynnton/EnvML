@@ -96,8 +96,24 @@ elabExp e =
     (EnvML.Anno e1 ty)      ->
       CoreFE.Anno (elabExp e1) (elabTyp ty)
     (EnvML.Mod m)           -> elabModuleExp m
-    (EnvML.BinOp op)        ->
-      error $ "TODO: Binary operators to be supported " ++ show op
+    (EnvML.BinOp (EnvML.Add e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Add (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Sub e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Sub (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Mul e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Mul (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.EqEq e1 e2)) ->
+      CoreFE.BinOp (CoreFE.EqEq (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Neq e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Neq (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Lt e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Lt (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Le e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Le (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Gt e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Gt (elabExp e1) (elabExp e2))
+    (EnvML.BinOp (EnvML.Ge e1 e2)) ->
+      CoreFE.BinOp (CoreFE.Ge (elabExp e1) (elabExp e2))
     (EnvML.EList es)        -> CoreFE.EList (map elabExp es)
     (EnvML.ETake i e1)      -> CoreFE.ETake i (elabExp e1)
 
