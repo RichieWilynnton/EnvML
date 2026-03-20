@@ -1,7 +1,3 @@
--- type T <> = A int | B;
--- type Option<a> = None | Some a;
+type Option<a> = None | Some a;
 --let x = None @ int;
--- let y = Some @ int (2);
-
-let f : int -> (forall a. int) = fun (x) (type a) -> x;
-let res = f(2) @ int;
+let y = Some @ int (2);

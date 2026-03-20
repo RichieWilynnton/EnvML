@@ -148,6 +148,15 @@ getVar (TypeEq _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
+-- TySubst (TyArr a b) ====> TyArr (TySubst a) (TySubst b)
+-- TODO: Verify that this won't ruin things
+asArrowTy :: Typ -> Maybe (Typ, Typ)
+asArrowTy (TyArr a b) = Just (a, b)
+asArrowTy (TySubstT s t) = do
+  (a, b) <- asArrowTy t
+  pure (TySubstT s a, TySubstT s b)
+asArrowTy _ = Nothing
+
 -- | Infer the type of an expression
 infer :: TyEnv -> Exp -> Maybe Typ
 infer _ (Lit lit) = pure $ TyLit $ inferLit lit
@@ -157,11 +166,9 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitStr _) = TyStr
 infer g (Var x) = getVar g x
 infer g (App e1 e2) = do
-  traceM $ ("hello") ++ (show $ infer g e1)
-  TyArr a b <- infer g e1
-  traceM ("Inferring type of application1: " ++ show (App e1 e2))
+  funTy <- infer g e1
+  (a, b) <- asArrowTy funTy
   guard (check g e2 a)
-  traceM ("Inferring type of application2: " ++ show (App e1 e2))
   return b
 infer g (TLam e) =
     TyAll <$> infer (Kind : g) e
