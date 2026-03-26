@@ -29,8 +29,8 @@ tshift x (TyMu t) = TyMu (tshift (1 + x) t) -- TODO: Verify
 typeSubst :: Typ -> Int -> Typ -> Typ
 typeSubst _ _ (TyLit l) = TyLit l
 typeSubst s i (TyVar j)
-  | j == i    = s
-  | j > i     = TyVar (j - 1)
+  | j == i = s
+  | j > i = TyVar (j - 1)
   | otherwise = TyVar j
 typeSubst s i (TyArr a b) = TyArr (typeSubst s i a) (typeSubst s i b)
 typeSubst s i (TyAll a) = TyAll (typeSubst (tshift 0 s) (i + 1) a)
@@ -111,7 +111,7 @@ teq g1 (TySum c1) (TySum c2) g2 =
   length c1 == length c2
     && and
       [ n1 == n2 && teq g1 t1 t2 g2
-      | ((n1, t1), (n2, t2)) <- zip c1 c2
+        | ((n1, t1), (n2, t2)) <- zip c1 c2
       ]
 teq g1 (TyList a) (TyList b) g2 =
   -- ADD THIS
@@ -208,7 +208,7 @@ infer g (App e1 e2) = do
   guard (check g e2 a)
   return b
 infer g (TLam e) =
-    TyAll <$> infer (Kind : g) e
+  TyAll <$> infer (Kind : g) e
 infer g (TApp e t) = do
   TyAll b <- infer g e
   return (TySubstT t b)
@@ -217,16 +217,16 @@ infer g (Box d e) = do
   TyBoxT g1 <$> infer g1 e
 infer _ (FEnv []) = pure (TyEnvt [])
 infer g (FEnv (ExpE e : d)) = do
-    TyEnvt g1 <- infer g (FEnv d)
-    a <- infer (g1 ++ g) e
-    return (TyEnvt (Type a : g1))
+  TyEnvt g1 <- infer g (FEnv d)
+  a <- infer (g1 ++ g) e
+  return (TyEnvt (Type a : g1))
 infer g (FEnv (RecE e : d)) = do
-    TyEnvt g1 <- infer g (FEnv d)
-    a <- infer (g1 ++ g) e
-    return (TyEnvt (Type a : g1))
+  TyEnvt g1 <- infer g (FEnv d)
+  a <- infer (g1 ++ g) e
+  return (TyEnvt (Type a : g1))
 infer g (FEnv (TypE t : d)) = do
-    TyEnvt g1 <- infer g (FEnv d)
-    return (TyEnvt (TypeEq t : g1))
+  TyEnvt g1 <- infer g (FEnv d)
+  return (TyEnvt (TypeEq t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
   t <- infer g e
@@ -306,7 +306,7 @@ infer _ _ = Nothing
 check :: TyEnv -> Exp -> Typ -> Bool
 check g e (TySubstT a b) = check (TypeEq a : g) e b
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
-check g (TLam e) (TyAll a) = 
+check g (TLam e) (TyAll a) =
   check (Kind : g) e a
 check g (Clos d e) (TyBoxT g1 (TyArr a b)) =
   case infer g (FEnv d) of
@@ -334,13 +334,8 @@ check _ (EList []) (TyList _) = True -- Empty list checks against any list type
 check g (EList es) (TyList t) = all (\e -> check g e t) es
 check g e t =
   case infer g e of
-    Just t' -> trace (show t' ++ " == " ++ show t ++ "? " ++ show (teq g t' t g) ++ "in " ++ show g) $
-      teq g t' t g
-    _ -> 
-      case t of
-        TyVar n -> trace ("FAILED to check: " ++ show e ++ " against type: " ++ show t ++ " lookup: " ++ show (lookt g n) ++ ") in " ++ show g) $
-          False
-        _ -> False
+    Just t' -> teq g t' t g
+    _ -> False
 
 inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
 inferCaseBranches _ _ [] = Nothing

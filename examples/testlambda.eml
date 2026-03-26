@@ -62,27 +62,6 @@ let eval : exp -> maybeExp =
                      
     );
 
-let tyEq : ty -> ty -> bool =
-    fix go. fun (a : ty) (b : ty) -> (
-        case a of
-        | <TNat = n1> =>
-            (case b of
-            | <TNat = n2> => true
-            | _ => false)
-        | <TBool = b1> =>
-            (case b of
-            | <TBool = b2> => true
-            | _ => false)
-        | <TArrow = a1> =>
-            (case b of
-            | <TArrow = b1> =>
-                if go(a1.arg)(b1.arg) then
-                    go(a1.ret)(b1.ret)
-                else
-                    false
-            | _ => false)
-    );
-
 let lookupTy : string -> tyCtx -> maybeTy =
     fix go. fun (name : string) (ctx : tyCtx) -> (
         case ctx of
@@ -118,7 +97,7 @@ let typeCheck : tyCtx -> exp -> maybeTy =
                 | <TyOk = argT> =>
                     case funcT of
                     | <TArrow = arr> =>
-                        if tyEq(arr.arg)(argT) then
+                        if arr.arg == argT then
                             TyOk(arr.ret) as maybeTy
                         else
                             TyError("Type error: argument type mismatch") as maybeTy
@@ -163,4 +142,3 @@ let checkExample = box [
     {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
     {evalRes = eval (app2)}
 ];
-
