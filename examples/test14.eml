@@ -1,26 +1,13 @@
-type Shape = Circle as int | Square as {w : int, h : int};
+type Shape = Square as int | Rect as {w : int, h : int};
 
-let a = Circle(2) as Shape;
-let b = Square({w = 3, h = 4}) as Shape;
+let a = Square(2) as Shape;
+let b = Rect({w = 3, h = 4}) as Shape;
 
 let area : Shape -> int =
   fun (s : Shape) ->
     case s of 
-    | <Circle=r> => r * r 
-    | <Square=dim> => dim.w * dim.h;
+    | <Square=r> => r * r 
+    | <Rect=dim> => dim.w * dim.h;
 
-let n = area (b);
-
-type Addr = Physical as {firstlast : string} | Virtual as {name : string};
-
-let getName : Addr -> string =
-  fun (a : Addr) ->
-    case a of 
-    | <Virtual=y> => y.name
-    | _ => "Here";
-
-let v_addr = Virtual({name = "Hello"}) as Addr;
-let v_name = getName (v_addr);
-let p_addr = Physical({firstlast = "Hey"}) as Addr;
-let p_name = getName (p_addr);
-
+let resultA : int = area(a);
+let resultB : int = area(b);

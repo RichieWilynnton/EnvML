@@ -7,7 +7,7 @@ type Name = String
 
 type Env = [EnvE]
 -- Distinction between x = e and m = e is to differentiate between record projection variable vs. expression variable
-data EnvE 
+data EnvE
   = ExpE Name Exp -- x = e
   | ModE Name Exp -- m = ..
   | TypE Name Typ -- t = A
@@ -108,9 +108,9 @@ prettyTyp (TyArr t1 t2) =
     in s1 ++ " -> " ++ s2
 prettyTyp (TyAll n t) = "forall " ++ n ++ ". " ++ prettyTyp t
 prettyTyp (TyMu n t) = "mu " ++ n ++ ". " ++ prettyTyp t
-prettyTyp (TyBoxT env t) = 
+prettyTyp (TyBoxT env t) =
     "[" ++ prettyTyEnv env ++ "] => " ++ prettyTyp t
-prettyTyp (TySubstT n t1 t2) = 
+prettyTyp (TySubstT n t1 t2) =
     "[" ++ n ++ " = " ++ prettyTyp t1 ++ "] " ++ prettyTyp t2
 prettyTyp (TyRcd label t) = "{" ++ label ++ " : " ++ prettyTyp t ++ "}"
 prettyTyp (TySum ctors) =
@@ -123,6 +123,7 @@ prettyTyLit :: Nameless.TyLit -> String
 prettyTyLit Nameless.TyInt  = "int"
 prettyTyLit Nameless.TyBool = "bool"
 prettyTyLit Nameless.TyStr  = "string"
+prettyTyLit Nameless.TyUnit = "unit"
 
 isArrowTyp :: Typ -> Bool
 isArrowTyp (TyArr _ _) = True
@@ -154,19 +155,19 @@ prettyExp (BinOp (Gt e1 e2)) = prettyExp e1 ++ " > " ++ prettyExp e2
 prettyExp (BinOp (Ge e1 e2)) = prettyExp e1 ++ " >= " ++ prettyExp e2
 prettyExp (Lam n e) = "λ" ++ n ++ ". " ++ prettyExp e
 prettyExp (TLam n e) = "Λ" ++ n ++ ". " ++ prettyExp e
-prettyExp (Clos env e) = 
+prettyExp (Clos env e) =
     "⟨[" ++ prettyEnv env ++ "] | " ++ prettyExp e ++ "⟩"
-prettyExp (TClos env e) = 
+prettyExp (TClos env e) =
     "⟨[" ++ prettyEnv env ++ "] | " ++ prettyExp e ++ "⟩"
 prettyExp (App e1 e2) =
     prettyExp e1 ++ "(" ++ prettyExp e2 ++ ")"
-prettyExp (TApp e t) = 
+prettyExp (TApp e t) =
     prettyExp e ++ " @" ++ prettyTyp t
 prettyExp (Box env e) =
     "[" ++ prettyEnv env ++ "] => " ++ prettyExp e
-prettyExp (Rec label e) = 
+prettyExp (Rec label e) =
     "{" ++ label ++ " = " ++ prettyExp e ++ "}"
-prettyExp (RProj e label) = 
+prettyExp (RProj e label) =
     parenIf (needsParenProj e) (prettyExp e) ++ "." ++ label
 prettyExp (FEnv env) = "[" ++ prettyEnv env ++ "]"
 prettyExp (Anno e t) =
@@ -219,6 +220,7 @@ prettyLit :: Nameless.Literal -> String
 prettyLit (Nameless.LitInt n) = show n
 prettyLit (Nameless.LitBool b) = if b then "true" else "false"
 prettyLit (Nameless.LitStr s) = "\"" ++ s ++ "\""
+prettyLit Nameless.LitUnit = "unit"
 
 
 parenIf :: Bool -> String -> String
