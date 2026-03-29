@@ -50,13 +50,12 @@ inductive Exp where
   deriving Repr
 
 inductive Value : Exp → Prop where
-  | vint   {n}     : Value (.lit n)
-  | vunit          : Value .unit
-  | vclos  {v A e} : Value v  → Value (.clos v A e)
-  | vmclos {v A e} : Value v  → Value (.mclos v A e)
-  | vmrg   {v₁ v₂} : Value v₁ → Value v₂ → Value (.mrg v₁ v₂)
-  | vnmrg  {v₁ v₂} : Value v₁ → Value v₂ → Value (.nmrg v₁ v₂)
-  | vlrec  {v l}   : Value v  → Value (.lrec l v)
+  | vint   {n}      : Value (.lit n)
+  | vunit           : Value .unit
+  | vclos  {v A e}  : Value v → Value (.clos v A e)
+  | vmclos {v A e}  : Value v → Value (.mclos v A e)
+  | vmrg   {v₁ v₂}  : Value v₁ → Value v₂ → Value (.mrg v₁ v₂)
+  | vlrec  {v l}    : Value v → Value (.lrec l v)
 
 inductive SLookup : Typ → Nat → Typ → Prop
 | zero (A B : Typ) : SLookup (Typ.and A B) 0 B

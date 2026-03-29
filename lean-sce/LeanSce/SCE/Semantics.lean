@@ -84,7 +84,7 @@ inductive BStep : Exp → Exp → Exp → Prop where
     : Value ρ
     → BStep ρ e₁ v₁
     → BStep ρ e₂ v₂
-    → BStep ρ (.nmrg e₁ e₂) (.nmrg v₁ v₂)
+    → BStep ρ (.nmrg e₁ e₂) (.mrg v₁ v₂)
   | lrec {ρ e v : Exp} {l : String}
     : Value ρ
     → BStep ρ e v

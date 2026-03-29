@@ -389,14 +389,41 @@ theorem elaboration_uniqueness
       have hce2 := ih2 h2'
       rw [hce1, hce2]
 
-/-- Elaborated core expression is well-typed in core -/
+theorem elab_value
+    {Γ A : SCE.Typ} {v : SCE.Exp} {cv : Core.Exp}
+    (helab : elabExp Γ v A cv)
+    (hval : SCE.Value v)
+    : Core.Value cv := by
+  induction hval generalizing Γ A cv with
+  | vint =>
+    cases helab
+    exact Core.Value.vint
+  | vunit =>
+    cases helab
+    exact Core.Value.vunit
+  | vclos hv ih =>
+    cases helab with
+    | eclos _ _ _ _ _ _ ce1 ce2 _ h1 h2 =>
+      exact Core.Value.vclos (ih h1)
+  | vmclos hv ih =>
+    cases helab with
+    | mclos _ _ _ _ _ _ ce1 ce2 _ h1 h2 =>
+      exact Core.Value.vclos (ih h1)
+  | vmrg hv1 hv2 ih1 ih2 =>
+    cases helab with
+    | edmrg _ _ _ _ _ ce1 ce2 h1 h2 =>
+      exact Core.Value.vmrg (ih1 h1) (ih2 h2)
+  | vlrec hv ih =>
+    cases helab with
+    | elrec _ _ _ ce _ h =>
+      exact Core.Value.vrcd (ih h)
+
 theorem type_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     (h : elabExp Γ es A ec)
     : HasType (elabTyp Γ) ec (elabTyp A) := by
     induction h with
     | equery =>
-      rename_i ctx
       exact HasType.tquery
     | elit ctx n =>
       simp [elabTyp]
@@ -404,48 +431,83 @@ theorem type_preservation
     | eunit ctx =>
       simp [elabTyp]
       exact HasType.tunit
-    | eapp ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+    | eapp ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
       exact HasType.tapp ih1 ih2
-    | eproj ctx A B se ce i el1 hlook ih =>
-      apply HasType.tproj
-      · apply ih
-      · apply type_safe_index_lookup
-        assumption
-    | ebox ctx ctx' A se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
-      apply HasType.tbox ih1 ih2
-    | edmrg ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+    | eproj ctx A B se ce i _ hlook ih =>
+      exact HasType.tproj ih (type_safe_index_lookup hlook)
+    | ebox ctx ctx' A se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+      exact HasType.tbox ih1 ih2
+    | edmrg ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
       simp [elabTyp]
-      apply HasType.tmrg ih1 ih2
-    | enmrg ctx A B se1 se2 ce1 ce2 el1 el2 ih1 ih2 =>
+      exact HasType.tmrg ih1 ih2
+    | enmrg ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
       simp [elabTyp]
       apply HasType.tapp
-      · rename_i A1
-        apply HasType.tlam
+      · apply HasType.tlam
         apply HasType.tmrg
         · apply HasType.tbox
-          · apply HasType.tproj
-            · exact HasType.tquery
-            . exact Lookup.zero
-          · assumption
+          · exact HasType.tproj HasType.tquery Lookup.zero
+          · exact ih1
         · apply HasType.tbox
-          · apply HasType.tproj
-            · apply HasType.tquery
-            · sorry
-          · sorry
-          · sorry
+          · exact HasType.tproj HasType.tquery (Lookup.succ Lookup.zero)
+          · exact ih2
       · exact HasType.tquery
-    | _ => sorry
+    | elam ctx A B se ce _ ih =>
+      simp [elabTyp]
+      exact HasType.tlam ih
+    | erproj ctx A B se ce l _ hlook ih =>
+      exact HasType.trproj ih (type_safe_record_lookup hlook)
+    | eclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
+
+      simp [elabTyp]
+      exact HasType.tclos (sorry) ih1 ih2  -- need: Value ce1
+    | elrec ctx A se ce l _ ih =>
+      simp [elabTyp]
+      exact HasType.trcd ih
+    | letb ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+      sorry
+    | openm ctx A B se1 se2 ce1 ce2 l _ _ ih1 ih2 =>
+      sorry
+    | mstruct ctx ctxInner B sb se ce envCore hs1 hs2 _ ih =>
+      simp [elabTyp, elabModTyp]
+      cases sb with
+      | sandboxed =>
+        have := hs1 rfl
+        rw [this] at ih
+        simp [elabTyp] at ih
+        exact HasType.tbox HasType.tunit ih
+      | open_ =>
+        have := hs2 rfl
+        rw [this] at ih
+        exact HasType.tbox HasType.tquery ih
+    | mfunctor ctx ctxInner A B sb se ce hs1 hs2 _ ih =>
+      simp [elabTyp, elabModTyp]
+      cases sb with
+      | sandboxed =>
+        have := hs1 rfl
+        rw [this] at ih
+        simp [elabTyp] at ih
+        exact HasType.tbox HasType.tunit (HasType.tlam ih)
+      | open_ =>
+        have := hs2 rfl
+        rw [this] at ih
+        simp [elabTyp] at ih
+        exact HasType.tlam ih
+    | mclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
+      simp [elabTyp, elabModTyp]
+      exact HasType.tclos (sorry) ih1 ih2  -- need: Value ce1
+    | mapp ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+      simp [elabTyp]
+      exact HasType.tapp ih1 ih2
+    | mlink ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+      simp [elabTyp]
+      sorry
 
 -- ============================================
 -- Values elaborate to values
 -- ============================================
 
-/-- If a source value elaborates, the core result is a core value -/
-theorem elab_value
-    {Γ A : SCE.Typ} {v : SCE.Exp} {cv : Core.Exp}
-    (helab : elabExp Γ v A cv)
-    (hval : SCE.Value v)
-    : Core.Value cv := by sorry
+
 
 /--
   If es elaborates to ec, and es evaluates to vs under ρs,
