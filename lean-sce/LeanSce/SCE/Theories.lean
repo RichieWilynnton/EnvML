@@ -7,6 +7,13 @@ import LeanSce.SCE.Elaboration
 
 open SCE Core
 
+inductive CoreLink
+    : Core.Typ → String → Core.Typ → Core.Typ → Core.Typ
+    → Core.Exp → Core.Exp → Core.Exp → Prop where
+  | link (Γ A₁ A B : Core.Typ) (l : String) (ec₁ ec₂ : Core.Exp)
+    : Core.RLookup A₁ l A
+    → CoreLink Γ l A₁ A B ec₁ ec₂ (linkedCore Γ l ec₁ ec₂)
+
 theorem index_lookup_uniqueness
     {T T₁ T₂ : SCE.Typ} {n : Nat}
     (h₁ : SLookup T n T₁)
@@ -237,15 +244,14 @@ theorem inference_uniqueness
       have := ih1 h1'
       rw [hA] at this
       cases this; rfl
-  | mlink ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+  | mlink ctx Γ₁ A mt l se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
     intro ce₂ T₂ h₂
     cases h₂ with
-    | mlink _ a' mt' _ _ ce1' ce2' h1' h2' =>
-      have hA := ih1 h1'
+    | mlink _ Γ₁' A' mt' l' _ _ ce1' ce2' h1' h2' _ =>
+      have hΓ := ih1 h1'
       have := ih2 h2'
-      rw [hA] at this
       cases this
-      rw [hA]
+      rw [hΓ]
 
 theorem elaboration_uniqueness
     {Γ T₁ T₂ : SCE.Typ} {e : SCE.Exp} {ce₁ ce₂ : Core.Exp}
@@ -381,12 +387,14 @@ theorem elaboration_uniqueness
       have hce1 := ih1 h1'
       have hce2 := ih2 h2'
       rw [hce1, hce2]
-  | mlink ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+  | mlink ctx Γ₁ A mt l se1 se2 ce1 ce2 h1_orig h2_orig _ ih1 ih2 =>
     intro ce₂ T₂ h₂
     cases h₂ with
-    | mlink _ a' mt' _ _ ce1' ce2' h1' h2' =>
+    | mlink _ Γ₁' A' mt' l' _ _ ce1' ce2' h1' h2' _ =>
       have hce1 := ih1 h1'
       have hce2 := ih2 h2'
+      have htyp := inference_uniqueness h2_orig h2'
+      cases htyp
       rw [hce1, hce2]
 
 theorem elab_value
@@ -457,17 +465,16 @@ theorem type_preservation
       exact HasType.tlam ih
     | erproj ctx A B se ce l _ hlook ih =>
       exact HasType.trproj ih (type_safe_record_lookup hlook)
-    | eclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
-
+    | eclos ctx ctx' A B se1 se2 ce1 ce2 hval h1 h2 ih1 ih2 =>
       simp [elabTyp]
-      exact HasType.tclos (sorry) ih1 ih2  -- need: Value ce1
+      exact HasType.tclos (elab_value h1 hval) ih1 ih2
     | elrec ctx A se ce l _ ih =>
       simp [elabTyp]
       exact HasType.trcd ih
     | letb ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
-      sorry
+      exact HasType.tapp (HasType.tlam ih2) ih1
     | openm ctx A B se1 se2 ce1 ce2 l _ _ ih1 ih2 =>
-      sorry
+      exact HasType.tapp (HasType.tlam ih2) (HasType.trproj ih1 Core.RLookup.zero)
     | mstruct ctx ctxInner B sb se ce envCore hs1 hs2 _ ih =>
       simp [elabTyp, elabModTyp]
       cases sb with
@@ -493,27 +500,26 @@ theorem type_preservation
         rw [this] at ih
         simp [elabTyp] at ih
         exact HasType.tlam ih
-    | mclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
+    | mclos ctx ctx' A B se1 se2 ce1 ce2 hval h1 h2 ih1 ih2 =>
       simp [elabTyp, elabModTyp]
-      exact HasType.tclos (sorry) ih1 ih2  -- need: Value ce1
+      exact HasType.tclos (elab_value h1 hval) ih1 ih2
     | mapp ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
       simp [elabTyp]
       exact HasType.tapp ih1 ih2
-    | mlink ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
-      simp [elabTyp]
-      sorry
+    | mlink ctx Γ₁ A mt l se1 se2 ce1 ce2 _ _ hlookup ih1 ih2 =>
+      simp [elabTyp, elabModTyp, linkedCore]
+      apply HasType.tapp
+      · apply HasType.tlam
+        apply HasType.tmrg
+        · apply HasType.tbox
+          · exact HasType.tproj HasType.tquery Lookup.zero
+          · exact ih1
+        · apply HasType.tbox
+          · exact HasType.tproj HasType.tquery (Lookup.succ Lookup.zero)
+          · exact HasType.tapp ih2
+              (HasType.trcd (HasType.trproj ih1 (type_safe_record_lookup hlookup)))
+      · exact HasType.tquery
 
--- ============================================
--- Values elaborate to values
--- ============================================
-
-
-
-/--
-  If es elaborates to ec, and es evaluates to vs under ρs,
-  and ρs elaborates to ρc, then ec evaluates to some vc
-  under ρc, and vs elaborates to vc.
--/
 theorem semantic_preservation
     {Γ A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp}
     {ρs vs : SCE.Exp} {ρc : Core.Exp}
@@ -523,10 +529,6 @@ theorem semantic_preservation
     (henv_val : SCE.Value ρs)
     : ∃ vc, EBig ρc ec vc ∧ elabExp SCE.Typ.top vs A vc := by sorry
 
-/--
-  A closed well-elaborated program evaluates
-  consistently across source and core.
--/
 theorem whole_program_correctness
     {A : SCE.Typ} {es : SCE.Exp} {ec : Core.Exp} {vs : SCE.Exp}
     (helab : elabExp SCE.Typ.top es A ec)
@@ -539,26 +541,47 @@ theorem whole_program_correctness
 def linkSCE (e₁ e₂ : SCE.Exp) : SCE.Exp :=
   .mlink e₁ e₂
 
-def linkCore (e₁ e₂ : Core.Exp) : Core.Exp :=
-  .mrg e₁ (.app e₂ e₁)
-
+theorem core_link_typed
+    {Γ A₁ A B : Core.Typ} {l : String} {ec₁ ec₂ ec : Core.Exp}
+    (hlink : CoreLink Γ l A₁ A B ec₁ ec₂ ec)
+    (h₁ : HasType Γ ec₁ A₁)
+    (h₂ : HasType Γ ec₂ (.arr (.rcd l A) B))
+    : HasType Γ ec (.and A₁ B) :=
+    by sorry
 /--
   Separate compilation: compiling components separately
   then linking in core preserves the behavior of
   linking in source then evaluating.
 -/
 theorem separate_compilation
-    {Γ A : SCE.Typ} {mt : SCE.ModTyp}
-    {es₁ es₂ : SCE.Exp} {ec₁ ec₂ : Core.Exp}
+    {Γ Γ₁ A : SCE.Typ} {mt : SCE.ModTyp} {l : String}
+    {es₁ es₂ : SCE.Exp} {ec₁ ec₂ ec : Core.Exp}
     {ρs vs : SCE.Exp} {ρc : Core.Exp}
-    (helab₁ : elabExp Γ es₁ A ec₁)
-    (helab₂ : elabExp Γ es₂ (SCE.Typ.sig (SCE.ModTyp.TyArrM A mt)) ec₂)
-    (heval : S_Sem.BStep ρs (linkSCE es₁ es₂) vs)
+    (helab₁ : elabExp Γ es₁ Γ₁ ec₁)
+    (helab₂ : elabExp Γ es₂ (.sig (.TyArrM (.rcd l A) mt)) ec₂)
+    (hlookup : SRLookup Γ₁ l A)
+    (hlink : CoreLink (elabTyp Γ) l (elabTyp Γ₁) (elabTyp A) (elabModTyp mt) ec₁ ec₂ ec)
+    (heval : S_Sem.BStep ρs (.mlink es₁ es₂) vs)
     (henv : elabExp SCE.Typ.top ρs Γ ρc)
     (henv_val : SCE.Value ρs)
-    : ∃ vc, EBig ρc (linkCore ec₁ ec₂) vc
-           ∧ elabExp SCE.Typ.top vs (.and A (.sig mt)) vc := by
-  have hmlink : elabExp Γ (linkSCE es₁ es₂) (.and A (.sig mt))
-      (linkCore ec₁ ec₂) :=
-    elabExp.mlink Γ A mt es₁ es₂ ec₁ ec₂ helab₁ helab₂
-  exact semantic_preservation hmlink heval henv henv_val
+    : ∃ vc, EBig ρc ec vc
+           ∧ elabExp SCE.Typ.top vs (.and Γ₁ (.sig mt)) vc := by sorry
+
+/-
+Dynamic and Static linking at Source with first-class modules
+
+Elaboration rules
+  Γ ⊢ e1 : Γ₁ ⤳ e1'
+  Γ ⊢ e2 : {l : A} →m B ⤳ e2'
+  {l : A} ∈ Γ₁
+  ----------------------------------------------
+  Γ ⊢ linkₛ(e1, e2) : Γ₁ & B → linkc(e1, e2)
+
+Semantics
+  v ⊢ e1              => v1
+  v ⊢ e2              => ⟨v', functor {l : A}, e3⟩m
+  v1 ⊢ ?.l            => vₗ
+  v' ,, {l = vₗ} ⊢ e3 => v3
+  ----------------------------------------------
+  v ⊢ linkₛ(e1, e2) => v1 ,, v3
+-/

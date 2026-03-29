@@ -1,7 +1,18 @@
 import LeanSce.SCE.Syntax
 import LeanSce.Core.Syntax
 
+
 open SCE
+
+def linkedCore (ctx : Core.Typ) (l : String) (ce₁ ce₂ : Core.Exp) : Core.Exp :=
+  Core.Exp.app
+    (Core.Exp.lam ctx
+      (Core.Exp.mrg
+        (Core.Exp.box (Core.Exp.proj Core.Exp.query 0) ce₁)
+        (Core.Exp.box (Core.Exp.proj Core.Exp.query 1)
+          (Core.Exp.app ce₂
+            (Core.Exp.lrec l (Core.Exp.rproj ce₁ l))))))
+    Core.Exp.query
 
 mutual
 @[simp]
@@ -114,8 +125,15 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
     → elabExp ctx se2 A ce2
     → elabExp ctx (Exp.mapp se1 se2) (Typ.sig mt)
         (Core.Exp.app ce1 ce2)
-  | mlink (ctx A : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
-    : elabExp ctx se1 A ce1
-    → elabExp ctx se2 (Typ.sig (ModTyp.TyArrM A mt)) ce2
-    → elabExp ctx (Exp.mlink se1 se2) (Typ.and A (Typ.sig mt))
-        (Core.Exp.mrg ce1 (Core.Exp.app ce2 ce1))
+  | mlink (ctx Γ₁ A : Typ) (mt : ModTyp) (l : String)
+      (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
+    : elabExp ctx se1 Γ₁ ce1
+    → elabExp ctx se2 (Typ.sig (ModTyp.TyArrM (Typ.rcd l A) mt)) ce2
+    → SRLookup Γ₁ l A
+    → elabExp ctx (Exp.mlink se1 se2) (Typ.and Γ₁ (Typ.sig mt))
+        (linkedCore (elabTyp ctx) l ce1 ce2)
+  -- | mlink (ctx A : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
+  --   : elabExp ctx se1 A ce1
+  --   → elabExp ctx se2 (Typ.sig (ModTyp.TyArrM A mt)) ce2
+  --   → elabExp ctx (Exp.mlink se1 se2) (Typ.and A (Typ.sig mt))
+  --       (Core.Exp.mrg ce1 (Core.Exp.app ce2 ce1))
