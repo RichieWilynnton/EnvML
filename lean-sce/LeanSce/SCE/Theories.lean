@@ -20,7 +20,19 @@ theorem record_lookup_uniqueness
     {T T₁ T₂ : SCE.Typ} {l : String}
     (h₁ : SCE.SRLookup T l T₁)
     (h₂ : SCE.SRLookup T l T₂)
-    : T₁ = T₂ := by sorry
+    : T₁ = T₂ := by
+  induction h₁ with
+  | zero l T => cases h₂; rfl
+  | andl A B l T _ h_cond ih =>
+    cases h₂ with
+    | andl _ _ _ _ h₂' _ => exact ih h₂'
+    | andr _ _ _ _ h₂' h_cond₂ =>
+      exact absurd (h_cond.1) h_cond₂.2
+  | andr A B l T _ h_cond ih =>
+    cases h₂ with
+    | andr _ _ _ _ h₂' _ => exact ih h₂'
+    | andl _ _ _ _ h₂' h_cond₂ =>
+      exact absurd (h_cond.1) h_cond₂.2
 
 theorem type_safe_index_lookup
     {ST₁ ST₂ : SCE.Typ} {n : Nat}
@@ -101,8 +113,6 @@ theorem type_preservation
         · apply HasType.tbox
           · apply HasType.tproj
             · apply HasType.tquery
-            · 
-              sorry
             · sorry
           · sorry
           · sorry
