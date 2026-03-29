@@ -110,12 +110,142 @@ theorem type_safe_record_lookup
       ⟨type_safe_label_nonexistence.mp h_cond.2,
        type_safe_label_existence.mp h_cond.1⟩
 
-/-- Same source expression in same context yields same type -/
 theorem inference_uniqueness
     {Γ T₁ T₂ : SCE.Typ} {e : SCE.Exp} {ce₁ ce₂ : Core.Exp}
     (h₁ : elabExp Γ e T₁ ce₁)
     (h₂ : elabExp Γ e T₂ ce₂)
-    : T₁ = T₂ := by sorry
+    : T₁ = T₂ := by
+  revert T₂ ce₂
+  induction h₁ with
+  | equery =>
+    intro ce₂ T₂ h₂; cases h₂; rfl
+  | elit _ n =>
+    intro ce₂ T₂ h₂; cases h₂; rfl
+  | eunit _ =>
+    intro ce₂ T₂ h₂; cases h₂; rfl
+  | eapp ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | eapp _ a' _ _ _ ce1' ce2' h1' h2' =>
+      have := ih1 h1'
+      cases this; rfl
+  | eproj ctx A B se ce i _ hlook ih =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | eproj _ a' _ _ ce' _ h' hlook' =>
+      have hA := ih h'
+      rw [hA] at hlook
+      exact index_lookup_uniqueness hlook hlook'
+  | ebox ctx ctx' A se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | ebox _ en _ _ _ ce1' ce2' h1' h2' =>
+      have hA := ih1 h1'
+      rw [hA] at ih2
+      exact ih2 h2'
+  | edmrg ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | edmrg _ a' b' _ _ ce1' ce2' h1' h2' =>
+      have hA := ih1 h1'
+      have hB := ih2 (hA ▸ h2')
+      rw [hA, hB]
+  | enmrg ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | enmrg _ a' b' _ _ ce1' ce2' h1' h2' =>
+      have hA := ih1 h1'
+      have hB := ih2 h2'
+      rw [hA, hB]
+  | elam ctx A B se ce _ ih =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | elam _ _ b' _ ce' h' =>
+      have hB := ih h'
+      rw [hB]
+  | erproj ctx A B se ce l _ hlook ih =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | erproj _ a' b' _ ce' _ h' hlook' =>
+      have hB := ih h'
+      rw [hB] at hlook
+      exact record_lookup_uniqueness hlook hlook'
+  | eclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | eclos _ et _ bT _ _ ce1' ce2' _ h1' h2' =>
+      have hA := ih1 h1'
+      have hB := ih2 (hA ▸ h2')
+      rw [hB]
+  | elrec ctx A se ce l _ ih =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | elrec _ a' _ ce' _ h' =>
+      have hA := ih h'
+      rw [hA]
+  | letb ctx A B se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | letb _ _ b' _ _ ce1' ce2' h1' h2' =>
+      exact ih2 h2'
+  | openm ctx A B se1 se2 ce1 ce2 l _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | openm _ a' b' _ _ ce1' ce2' _ h1' h2' =>
+      have hA : SCE.Typ.rcd l A = SCE.Typ.rcd _ a' := ih1 h1'
+      cases hA
+      exact ih2 h2'
+  | mstruct ctx ctxInner B sb se ce envCore _ _ _ ih =>
+    intros T₂ ce₂ h₂
+    rename_i hs1 hs2 el1
+    cases h₂ with
+    | mstruct _ ci' b' _ _ ce' _ hs1' hs2' h' =>
+      have hCtx : ctxInner = ci' := by
+        cases sb with
+        | sandboxed =>
+          rw [hs1 rfl, hs1' rfl]
+        | open_ =>
+          rw [hs2 rfl, hs2' rfl]
+      rw [←hCtx] at h'
+      have hB := ih h'
+      rw [hB]
+  | mfunctor ctx ctxInner A B sb se ce _ _ _ ih =>
+    intro ce₂ T₂ h₂
+    rename_i hs1 hs2 el1
+    cases h₂ with
+    | mfunctor _ ci' _ b' _ _ ce' hs1' hs2' h' =>
+      have hCtx : ctxInner = ci' := by
+        cases sb with
+        | sandboxed => rw [hs1 rfl, hs1' rfl]
+        | open_ => rw [hs2 rfl, hs2' rfl]
+      rw [← hCtx] at h'
+      have hB := ih h'
+      rw [hB]
+  | mclos ctx ctx' A B se1 se2 ce1 ce2 _ _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | mclos _ et _ bT _ _ ce1' ce2' _ h1' h2' =>
+      have hA := ih1 h1'
+      rw [← hA] at h2'
+      have hB := ih2 h2'
+      rw [hB]
+  | mapp ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | mapp _ a' mt' _ _ ce1' ce2' h1' h2' =>
+      have hA := ih2 h2'
+      have := ih1 h1'
+      rw [hA] at this
+      cases this; rfl
+  | mlink ctx A mt se1 se2 ce1 ce2 _ _ ih1 ih2 =>
+    intro ce₂ T₂ h₂
+    cases h₂ with
+    | mlink _ a' mt' _ _ ce1' ce2' h1' h2' =>
+      have hA := ih1 h1'
+      have := ih2 h2'
+      rw [hA] at this
+      cases this
+      rw [hA]
 
 /-- Same source expression in same context yields same core expression -/
 theorem elaboration_uniqueness

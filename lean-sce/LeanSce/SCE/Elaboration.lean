@@ -95,19 +95,19 @@ inductive elabExp : TyCtx → Exp → Typ → Core.Exp → Prop
             | Sandbox.sandboxed => Core.Exp.unit
             | Sandbox.open_     => Core.Exp.query)
           ce)
-  | mfunctor (ctx ctxInner A B : Typ) (mt : ModTyp) (sb : Sandbox) (se : Exp) (ce : Core.Exp)
+  | mfunctor (ctx ctxInner A B : Typ) (sb : Sandbox) (se : Exp) (ce : Core.Exp)
     : (sb = Sandbox.sandboxed → ctxInner = Typ.and Typ.top A)
     → (sb = Sandbox.open_     → ctxInner = Typ.and ctx A)
     → elabExp ctxInner se B ce
-    → elabExp ctx (Exp.mfunctor sb A se) (Typ.sig mt)
+    → elabExp ctx (Exp.mfunctor sb A se) (Typ.sig (ModTyp.TyArrM A (ModTyp.TyIntf B)))
         (match sb with
           | Sandbox.sandboxed => Core.Exp.box Core.Exp.unit (Core.Exp.lam (elabTyp A) ce)
           | Sandbox.open_     => Core.Exp.lam (elabTyp A) ce)
-  | mclos (ctx ctx' A B : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
+  | mclos (ctx ctx' A B : Typ) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
     : SCE.Value se1
     → elabExp Typ.top se1 ctx' ce1
     → elabExp (Typ.and ctx' A) se2 B ce2
-    → elabExp ctx (Exp.mclos se1 A se2) (Typ.sig mt)
+    → elabExp ctx (Exp.mclos se1 A se2) (Typ.sig (ModTyp.TyArrM A (ModTyp.TyIntf B)))
         (Core.Exp.clos ce1 (elabTyp A) ce2)
   | mapp (ctx A : Typ) (mt : ModTyp) (se1 se2 : Exp) (ce1 ce2 : Core.Exp)
     : elabExp ctx se1 (Typ.sig (ModTyp.TyArrM A mt)) ce1
