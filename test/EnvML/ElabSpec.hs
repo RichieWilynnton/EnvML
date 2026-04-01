@@ -5,10 +5,10 @@ import EnvML.Syntax as Src
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import EnvML.Elab
+import EnvML.Desugar (desugarExp, desugarModule)
 import qualified CoreFE.Named as Named
 import qualified CoreFE.DeBruijn as DB
 import qualified CoreFE.Syntax as CoreFE
-import Control.Exception (evaluate)
 import Test.Hspec
 
 spec :: Spec
@@ -109,7 +109,7 @@ spec = do
     it "elaborates data constructor with source-level type annotation into core fold" $ do
       let input = "Nil(0) as NatList"
       let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (desugarExp parsed)
       named
         `shouldBe` Named.Fold
           (Named.TyVar "NatList")
@@ -118,7 +118,7 @@ spec = do
     it "elaborates case by inserting core unfold on the scrutinee" $ do
       let input = "case xs of | <Nil=h> => h | <Cons=t> => t"
       let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (desugarExp parsed)
       named
         `shouldBe` Named.Case
           (Named.Unfold (Named.Var "xs"))
@@ -129,7 +129,7 @@ spec = do
     it "elaborates wildcard case branch" $ do
       let input = "case xs of | _ => 0"
       let parsed = parseExp (lexer input)
-      let named = elabExp parsed
+      let named = elabExp (desugarExp parsed)
       named
         `shouldBe` Named.Case
           (Named.Unfold (Named.Var "xs"))
@@ -181,13 +181,13 @@ spec = do
                          (Named.TyAll "b" 
                            (Named.TyArr (Named.TyVar "a") (Named.TyVar "b")))
 
-    it "rejects inline sum annotations without a declared binder" $ do
+    it "elaborates inline sum type without TyMu wrapping" $ do
       let sumTy = Src.TySum [("Nil", Src.TyLit CoreFE.TyInt), ("Cons", Src.TyVar "NatList")]
-      evaluate
-        (case elabTyp sumTy of
-          Named.TyMu binder _ -> length binder
-          _ -> 0)
-        `shouldThrow` anyErrorCall
+      elabTyp sumTy
+        `shouldBe` Named.TySum
+          [ ("Nil", Named.TyLit CoreFE.TyInt)
+          , ("Cons", Named.TyVar "NatList")
+          ]
 
   describe "Elaborate Modules" $ do
     
@@ -205,7 +205,7 @@ spec = do
     it "wraps type declarations of sum types with the declared binder in core" $ do
       let input = "type NatList = Nil as int | Cons as NatList;"
       let parsed = parseModule (lexer input)
-      let named = elabModule parsed
+      let named = elabModule (desugarModule parsed)
       named
         `shouldBe` Named.FEnv
           [ Named.TypE

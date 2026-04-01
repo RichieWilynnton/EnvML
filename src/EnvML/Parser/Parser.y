@@ -104,7 +104,6 @@ ModuleStructs :: { Structures }
 ModuleStruct :: { Structure }
   : let    id          '=' Exp       ';' { Let $2 Nothing $4              }
   | let    id ':' Typ  '=' Exp       ';' { Let $2 (Just $4) $6            }
-  | type   id '<' TypeVars '>' '=' Constructors ';' { TypDecl $2 (foldr TyAll (TySum $7) $4) }
   | type   id          '=' Constructors ';' { TypDecl $2 (TySum $4)       }
   | type   id          '=' Typ       ';' { TypDecl $2 $4                  }
   | module id          '=' ModuleExp ';' { ModStruct $2 Nothing $4        }
@@ -251,7 +250,7 @@ BaseTyp :: { Typ }
   | '[' TyCtx ']'          { TyCtx $2 }
   | list BaseTyp           { TyList $2 }
   | '(' Typ ')'            { $2 }
-  | ModuleTyp              { TyModule $1 }
+  | sig Intf end           { TyModule (TySig $2) }
 
 TyRcdFields :: { [(Name, Typ)] }
   : id ':' Typ ',' TyRcdFields  { ($1, $3) : $5 }

@@ -92,11 +92,14 @@ elabExp e =
     (EnvML.Anno e1 ty) ->
       CoreFE.Anno (elabExp e1) (elabTyp ty)
     (EnvML.Mod m) -> elabModuleExp m
-    (EnvML.DataCon ctor arg ty) ->
-      let ty' = elabTyp ty
-       in CoreFE.Fold ty' (CoreFE.DataCon ctor (elabExp arg))
+    (EnvML.DataCon ctor arg _ty) ->
+      CoreFE.DataCon ctor (elabExp arg)
     (EnvML.Case scrutinee branches) ->
-      CoreFE.Case (CoreFE.Unfold (elabExp scrutinee)) (map elabCaseBranch branches)
+      CoreFE.Case (elabExp scrutinee) (map elabCaseBranch branches)
+    (EnvML.Fold ty e1) ->
+      CoreFE.Fold (elabTyp ty) (elabExp e1)
+    (EnvML.Unfold e1) ->
+      CoreFE.Unfold (elabExp e1)
     (EnvML.BinOp (EnvML.Add e1 e2)) ->
       CoreFE.BinOp (CoreFE.Add (elabExp e1) (elabExp e2))
     (EnvML.BinOp (EnvML.Sub e1 e2)) ->
@@ -160,11 +163,10 @@ elabTypWithBinder maybeBinder ty =
     (EnvML.TyBoxT ctx ty1) -> CoreFE.TyBoxT (elabTyCtx ctx) (elabTypWithBinder maybeBinder ty1)
     (EnvML.TyRcd fields) -> CoreFE.TyEnvt $ map (CoreFE.Type "_") $ elabRcdFieldsTy fields
     (EnvML.TySum ctors) ->
-      let binder = case maybeBinder of
-            Just n -> n
-            Nothing -> error "Sum types must be declared with a binder"
-          ctors' = [(name, elabTypWithBinder maybeBinder payloadTy) | (name, payloadTy) <- ctors]
-       in CoreFE.TyMu binder (CoreFE.TySum ctors')
+      let ctors' = [(name, elabTypWithBinder maybeBinder payloadTy) | (name, payloadTy) <- ctors]
+       in CoreFE.TySum ctors'
+    (EnvML.TyMu n ty1) ->
+      CoreFE.TyMu n (elabTypWithBinder (Just n) ty1)
     (EnvML.TyCtx ctx) -> CoreFE.TyEnvt (elabTyCtx ctx)
     (EnvML.TyModule mty) -> elabModTyp mty
     (EnvML.TyList ty1) -> CoreFE.TyList $ elabTypWithBinder maybeBinder ty1
