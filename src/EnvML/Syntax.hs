@@ -55,14 +55,13 @@ data Typ
   | TyList    Typ             -- [A]
   deriving (Show, Eq)
 
-
 data Module
   = VarM    Name
   | Functor FunArgs Module  -- functor (x : A) ->
   | Struct  Structures      -- struct type a = int; x = 1 end
   | MApp    Module Module   -- M1(M2)
   | MAppt   Module Typ      -- (M1 @A)
-  | MAnno   Module ModuleTyp
+  | MAnno   Module ModuleTyp  -- (M1 ::m S)
   deriving (Show, Eq)
 
 type Structures = [Structure]
@@ -94,7 +93,6 @@ data Exp
   | Fix   Name Exp          -- fix f. e
   | If    Exp Exp Exp       -- if e1 then e2 else e3
   | Lam   FunArgs Exp       -- fun (x: A) (y : B) -> x + 1
-  | TLam  FunArgs Exp       -- TODO: This is not used, should we remove it?
   | Clos  Env FunArgs Exp   -- clos [type t = int, x = 1] (y: t) -> x + y
   | App   Exp Exp           -- f(x)
   | TClos Env FunArgs Exp   -- clos [type t = int, x = 1] ->
@@ -279,7 +277,7 @@ prettyModuleTyp :: ModuleTyp -> String
 prettyModuleTyp (TyArrowM t m) = 
   prettyTyp t ++ " ->m " ++ prettyModuleTyp m
 prettyModuleTyp (ForallM n m) = 
-  "forall " ++ n ++ ". " ++ prettyModuleTyp m
+  "forallm " ++ n ++ ". " ++ prettyModuleTyp m
 prettyModuleTyp (TySig intf) = 
   "sig " ++ prettyIntf intf ++ " end"
 prettyModuleTyp (TyVarM n) = n
@@ -342,9 +340,9 @@ prettyModule (Functor args m) =
 prettyModule (Struct structs) =
   "struct " ++ prettyStructures structs ++ " end"
 prettyModule (MApp m1 m2) = 
-  prettyModule m1 ++ "(" ++ prettyModule m2 ++ ")"
+  prettyModule m1 ++ "(|" ++ prettyModule m2 ++ "|)"
 prettyModule (MAppt m t) = 
-  prettyModule m ++ " @" ++ prettyTyp t
+  prettyModule m ++ " @m " ++ prettyTyp t
 prettyModule (MAnno m1 mty) =
   "(" ++ prettyModule m1 ++ " :: " ++ prettyModuleTyp mty ++ ")"
 
@@ -359,9 +357,6 @@ prettyExp (If e1 e2 e3) =
 prettyExp (Lam args e) = 
   "fun " ++ prettyFunArgs args ++ " -> " ++ 
   parensIf (expPrec e < expPrec (Lam args e)) (prettyExp e)
-prettyExp (TLam args e) = 
-  "fun " ++ prettyFunArgs args ++ " -> " ++ 
-  parensIf (expPrec e < expPrec (TLam args e)) (prettyExp e)
 prettyExp (Clos env args e) = 
   "clos [" ++ prettyEnv env ++ "] " ++ prettyFunArgs args ++ " -> " ++ 
   parensIf (expPrec e < expPrec (Clos env args e)) (prettyExp e)

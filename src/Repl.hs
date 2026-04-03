@@ -17,6 +17,7 @@ import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
 import qualified EnvML.Desugar as Desugar
+import qualified EnvML.Desugared as Desugared
 import qualified CoreFE.Named as CoreNamed
 import qualified CoreFE.Syntax as CoreFE
 import qualified CoreFE.Check as Check
@@ -148,14 +149,14 @@ cmdDesugar :: FilePath -> IO ()
 cmdDesugar path = runPipeline path $ \ast -> do
   let desugared = Desugar.desugarModule ast
   putStrLn "=== Desugared AST ==="
-  putStrLn $ AST.pretty desugared
+  putStrLn $ Desugared.prettyModule desugared
 
 cmdSourceCheck :: FilePath -> IO ()
 cmdSourceCheck path = runPipeline path $ \ast -> do
-  let desugared = Desugar.desugarModule ast
   putStrLn "=== Source Type Checking ==="
+  let desugared = Desugar.desugarModule ast
   case desugared of
-    AST.Struct structs -> case SCheck.inferStructs [] structs of
+    Desugared.Struct structs -> case SCheck.inferStructs [] structs of
       Nothing -> putStrLn "✗ Source type check failed: Could not infer types"
       Just intf -> do
         putStrLn "✓ Source type check succeeded!"

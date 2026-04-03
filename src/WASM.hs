@@ -76,7 +76,6 @@ runSourceCheckDetailed :: JSString -> IO JSString
 runSourceCheckDetailed = safeRun $ \input ->
     let ast       = parseModule input
         desugared = Desugar.desugarModule ast
-        trace = "=== Source Type Check ===\n\n" ++ "Desugared AST:\n" ++ AST.pretty desugared ++ "\n\n"
     in case desugared of
         AST.Struct structs -> case SCheck.inferStructs [] structs of
             Nothing   -> "\10007 Source Type Error\n\nCould not infer types"

@@ -1,31 +1,29 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module EnvML.CheckSpec (spec) where
 
-import EnvML.Syntax as Src
+import EnvML.Syntax (Name, Typ(..), TyCtxE(..), TyCtx, ModuleTyp(..), FunArg(..), Intf, IntfE(..))
+import qualified EnvML.Desugared as D
+import EnvML.Desugar (desugarExp, desugarModule)
 import EnvML.Parser.Lexer (lexer)
 import EnvML.Parser.Parser (parseExp, parseModule, parseModuleTyp, parseTyp)
 import EnvML.Check
-import EnvML.Desugar (desugarExp, desugarModule)
 import qualified CoreFE.Syntax as CoreFE
 import Data.Maybe (isJust)
 import Test.Hspec
 import Debug.Trace (trace)
 
-pde :: String -> Src.Exp
-pde input = desugarExp (parseExp (lexer input))
+pe :: String -> D.Exp
+pe input = desugarExp (parseExp (lexer input))
 
-pe :: String -> Src.Exp
-pe input = parseExp (lexer input)
-
-pt :: String -> Src.Typ
+pt :: String -> Typ
 pt input = parseTyp (lexer input)
 
--- Helper: parse and desugar a module, infer its structures
-inferMod' :: String -> Maybe Src.Intf
+-- Helper: parse a module, desugar, and infer its structures
+inferMod' :: String -> Maybe Intf
 inferMod' input =
   let m = desugarModule (parseModule (lexer input))
   in case m of
-    Src.Struct structs -> inferStructs [] structs
+    D.Struct structs -> inferStructs [] structs
     _ -> Nothing
 
 spec :: Spec
@@ -129,30 +127,30 @@ spec = do
 
   describe "infer fenv" $ do
     it "infers empty fenv" $
-      infer [] (FEnv []) `shouldBe` Just (TyCtx [])
+      infer [] (D.FEnv []) `shouldBe` Just (TyCtx [])
 
     it "infers fenv with named expression" $
-      infer [] (FEnv [ExpEN "x" (Lit (CoreFE.LitInt 1))])
+      infer [] (D.FEnv [D.ExpEN "x" (D.Lit (CoreFE.LitInt 1))])
         `shouldBe` Just (TyCtx [TypeN "x" (TyLit CoreFE.TyInt)])
 
     it "infers fenv with multiple named expressions" $
-      infer [] (FEnv [ExpEN "x" (Lit (CoreFE.LitInt 1)),
-                       ExpEN "y" (Lit (CoreFE.LitBool True))])
+      infer [] (D.FEnv [D.ExpEN "x" (D.Lit (CoreFE.LitInt 1)),
+                         D.ExpEN "y" (D.Lit (CoreFE.LitBool True))])
         `shouldBe` Just (TyCtx [TypeN "x" (TyLit CoreFE.TyInt),
                                  TypeN "y" (TyLit CoreFE.TyBool)])
 
     it "infers fenv with named type" $
-      infer [] (FEnv [TypEN "t" (TyLit CoreFE.TyInt)])
+      infer [] (D.FEnv [D.TypEN "t" (TyLit CoreFE.TyInt)])
         `shouldBe` Just (TyCtx [TypeN "t" (TyLit CoreFE.TyInt)])
 
     it "infers fenv where later entry references earlier" $
-      infer [] (FEnv [ExpEN "y" (Var "x"),
-                       ExpEN "x" (Lit (CoreFE.LitInt 42))])
+      infer [] (D.FEnv [D.ExpEN "y" (D.Var "x"),
+                         D.ExpEN "x" (D.Lit (CoreFE.LitInt 42))])
         `shouldBe` Just (TyCtx [TypeN "y" (TyLit CoreFE.TyInt),
                                  TypeN "x" (TyLit CoreFE.TyInt)])
 
     it "fails fenv with unbound variable" $
-      infer [] (FEnv [ExpEN "x" (Var "z")])
+      infer [] (D.FEnv [D.ExpEN "x" (D.Var "z")])
         `shouldBe` Nothing
 
   describe "infer annotations" $ do
@@ -188,6 +186,14 @@ spec = do
     it "rejects lambda with wrong return type" $
       check [] (pe "fun (x : int) -> true") (TyArr (TyLit CoreFE.TyInt) (TyLit CoreFE.TyInt))
         `shouldBe` False
+
+    it "rejects lambda when TmArgType annotation mismatches checked arrow domain" $
+      check [] (pe "fun (x : bool) -> x") (TyArr (TyLit CoreFE.TyInt) (TyLit CoreFE.TyInt))
+        `shouldBe` False
+
+    it "accepts lambda when TmArgType annotation matches checked arrow domain" $
+      check [] (pe "fun (x : int) -> x") (TyArr (TyLit CoreFE.TyInt) (TyLit CoreFE.TyInt))
+        `shouldBe` True
 
   describe "check fix" $ do
     it "checks fixpoint" $
@@ -226,36 +232,61 @@ spec = do
       teq [] (TyMu "a" (TyVar "a")) (TyMu "b" (TyVar "b")) []
         `shouldBe` True
 
+    it "teq TyBoxT on left equals inner type with concrete ctx" $
+      let ctx = [TypeN "x" (TyLit CoreFE.TyInt)]
+      in teq [] (TyBoxT ctx (TyLit CoreFE.TyInt)) (TyLit CoreFE.TyInt) []
+        `shouldBe` True
+
+    it "teq TyBoxT on right equals inner type with concrete ctx" $
+      let ctx = [TypeN "x" (TyLit CoreFE.TyInt)]
+      in teq [] (TyLit CoreFE.TyInt) (TyBoxT ctx (TyLit CoreFE.TyInt)) []
+        `shouldBe` True
+
+    it "teq TyBoxT fails with non-concrete ctx" $
+      let ctx = [KindN "a"]
+      in teq [] (TyBoxT ctx (TyVar "a")) (TyLit CoreFE.TyInt) []
+        `shouldBe` False
+
+    it "teq TyBoxT resolves names from box ctx" $
+      let ctx = [TypeEqN "t" (TyLit CoreFE.TyInt)]
+      in teq [] (TyBoxT ctx (TyVar "t")) (TyLit CoreFE.TyInt) []
+        `shouldBe` True
+
+    it "teq TyModule equality" $
+      let mty = TySig [ValDecl "x" (TyLit CoreFE.TyInt)]
+      in teq [] (TyModule mty) (TyModule mty) []
+        `shouldBe` True
+
   describe "infer fold/unfold (desugared)" $ do
     it "infers fold with TyMu type" $
       let ty = TyMu "X" (TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)])
           ctx = []
-      in infer ctx (Fold ty (DataCon "Nil" (Lit CoreFE.LitUnit) (typeSubstName "X" ty (TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]))))
+      in infer ctx (D.Fold ty (D.DataCon "Nil" (D.Lit CoreFE.LitUnit) (typeSubstName "X" ty (TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]))))
         `shouldBe` Just ty
 
     it "infers unfold returns unfolded type" $
       let ty = TyMu "X" (TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)])
           ctx = [TypeN "x" ty]
-      in infer ctx (Unfold (Var "x"))
+      in infer ctx (D.Unfold (D.Var "x"))
         `shouldBe` Just (typeSubstName "X" ty (TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]))
 
   describe "infer case (desugared)" $ do
     it "infers case expression on sum type" $
       let sumTy = TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]
           ctx = [TypeN "x" sumTy]
-      in infer ctx (Case (Var "x") [CaseBranch "Nil" "u" (Lit (CoreFE.LitInt 0)),
-                                     CaseBranch "Cons" "n" (Var "n")])
+      in infer ctx (D.Case (D.Var "x") [D.CaseBranch "Nil" "u" (D.Lit (CoreFE.LitInt 0)),
+                                          D.CaseBranch "Cons" "n" (D.Var "n")])
         `shouldBe` Just (TyLit CoreFE.TyInt)
 
   describe "infer DataCon (check mode)" $ do
     it "checks DataCon against sum type" $
       let sumTy = TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]
-      in check [] (DataCon "Nil" (Lit CoreFE.LitUnit) sumTy) sumTy
+      in check [] (D.DataCon "Nil" (D.Lit CoreFE.LitUnit) sumTy) sumTy
         `shouldBe` True
 
     it "rejects DataCon with wrong payload" $
       let sumTy = TySum [("Nil", TyLit CoreFE.TyUnit), ("Cons", TyLit CoreFE.TyInt)]
-      in check [] (DataCon "Nil" (Lit (CoreFE.LitInt 1)) sumTy) sumTy
+      in check [] (D.DataCon "Nil" (D.Lit (CoreFE.LitInt 1)) sumTy) sumTy
         `shouldBe` False
 
   describe "infer modules" $ do
@@ -278,35 +309,53 @@ spec = do
 
   describe "checkMod" $ do
     it "checks struct against sig" $
-      let ctx = []
-          m = Struct [TypDecl "t" (TyLit CoreFE.TyInt),
-                      Let "x" (Just (TyVar "t")) (Lit (CoreFE.LitInt 1))]
+      let m = desugarModule (parseModule (lexer "type t = int; let x : t = 1;"))
           mty = TySig [TyDef "t" (TyLit CoreFE.TyInt),
                         ValDecl "x" (TyVar "t")]
-      in checkMod ctx m mty `shouldBe` True
+      in checkMod [] m mty `shouldBe` True
 
     it "checks functor against arrow module type" $
-      let ctx = []
-          m = Functor [("x", TmArgType (TyLit CoreFE.TyInt))]
-                       (Struct [Let "y" (Just (TyLit CoreFE.TyInt)) (Var "x")])
+      let m = desugarModule (parseModule (lexer "module m = functor (x : int) -> struct let y : int = x; end;"))
           mty = TyArrowM (TyLit CoreFE.TyInt)
                           (TySig [ValDecl "y" (TyLit CoreFE.TyInt)])
-      in checkMod ctx m mty `shouldBe` True
+      in case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` True
+        _ -> expectationFailure "Expected ModStruct"
 
     it "checks functor with type arg against ForallM" $
-      let ctx = []
-          m = Functor [("a", TyArg)]
-                       (Struct [Let "id" (Just (TyArr (TyVar "a") (TyVar "a")))
-                                 (Lam [("x", TmArgType (TyVar "a"))] (Var "x"))])
+      let m = desugarModule (parseModule (lexer "module m = functor (type a) -> struct let id : a -> a = fun (x) -> x; end;"))
           mty = ForallM "a" (TySig [ValDecl "id" (TyArr (TyVar "a") (TyVar "a"))])
-      in checkMod ctx m mty `shouldBe` True
+      in case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` True
+        _ -> expectationFailure "Expected ModStruct"
+
+    it "rejects functor when TmArgType annotation mismatches checked arrow domain" $
+      let m = desugarModule (parseModule (lexer "module m = functor (x : bool) -> struct end;"))
+          mty = TyArrowM (TyLit CoreFE.TyInt) (TySig [])
+      in case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` False
+        _ -> expectationFailure "Expected ModStruct"
+
+    it "accepts functor when TmArgType annotation matches checked arrow domain" $
+      let m = desugarModule (parseModule (lexer "module m = functor (x : int) -> struct end;"))
+          mty = TyArrowM (TyLit CoreFE.TyInt) (TySig [])
+      in case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` True
+        _ -> expectationFailure "Expected ModStruct"
+
+    it "accepts functor with unannotated TmArg against arrow module type" $
+      let m = desugarModule (parseModule (lexer "module m = functor (x) -> struct end;"))
+          mty = TyArrowM (TyLit CoreFE.TyInt) (TySig [])
+      in case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` True
+        _ -> expectationFailure "Expected ModStruct"
 
   describe "full module type checking (parsed)" $ do
     it "infers simple module" $ do
       let input = "let x : int = 42;"
       let m = desugarModule (parseModule (lexer input))
       case m of
-        Struct structs -> inferStructs [] structs
+        D.Struct structs -> inferStructs [] structs
           `shouldBe` Just [ValDecl "x" (TyLit CoreFE.TyInt)]
         _ -> expectationFailure "Expected Struct"
 
@@ -314,7 +363,7 @@ spec = do
       let input = "type t = int; let x : t = 42;"
       let m = desugarModule (parseModule (lexer input))
       case m of
-        Struct structs -> inferStructs [] structs
+        D.Struct structs -> inferStructs [] structs
           `shouldBe` Just [TyDef "t" (TyLit CoreFE.TyInt),
                            ValDecl "x" (TyVar "t")]
         _ -> expectationFailure "Expected Struct"
@@ -323,7 +372,7 @@ spec = do
       let input = "let f : int -> int = fun (x : int) -> x;"
       let m = desugarModule (parseModule (lexer input))
       case m of
-        Struct structs -> inferStructs [] structs
+        D.Struct structs -> inferStructs [] structs
           `shouldBe` Just [ValDecl "f" (TyArr (TyLit CoreFE.TyInt) (TyLit CoreFE.TyInt))]
         _ -> expectationFailure "Expected Struct"
 
@@ -331,16 +380,103 @@ spec = do
       let input = "module m : sig type t = int; val y : t; end = struct type t = int; let y : t = 10; end;"
       let m = desugarModule (parseModule (lexer input))
       case m of
-        Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
         _ -> expectationFailure "Expected Struct"
 
     it "infers polymorphic identity functor" $ do
       let input = unlines
-            [ "module type POLICY = forall t. sig val trans : t -> t; end;"
+            [ "module type POLICY = forallm t. sig val trans : t -> t; end;"
             , "module policy1 : POLICY = functor (type t) -> struct let trans : t -> t = fun (x) -> x; end;"
             ]
       let m = desugarModule (parseModule (lexer input))
       case m of
-        Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
         _ -> expectationFailure "Expected Struct"
 
+    it "infers module type application (@m)" $ do
+      let input = unlines
+            [ "module policy1 = functor (type t) -> struct let id : t -> t = fun (x) -> x; end;"
+            , "module result = policy1 @m int;"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"
+
+    it "infers module annotation (::m)" $ do
+      let input = unlines
+            [ "module policy1 = functor (type t) -> struct let id : t -> t = fun (x) -> x; end;"
+            , "module result = policy1 @m int ::m sig val id : int -> int; end;"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"
+
+    it "infers module projection from sig with type def" $ do
+      let input = "let f : int -> int = (struct type a = int; let id : a -> a = fun (x) -> x; end ::m sig type a = int; val id : a -> a; end).id;"
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"
+
+    it "infers functor with module-typed arg (->m)" $ do
+      let input = unlines
+            [ "module type POLICY = forallm t. sig val trans : t -> t; end;"
+            , "module foo : (forallm t. sig val trans : t -> t; end) ->m sig type a = int; val f : a -> a; end"
+            , "  = functor (m) -> struct type a = int;"
+            , "      let f : a -> a = ((m @m a) ::m sig val trans : int -> int; end).trans; end;"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"
+
+    it "infers module application (|...|)" $ do
+      let input = unlines
+            [ "module type POLICY = forallm t. sig val trans : t -> t; end;"
+            , "module policy1 : POLICY = functor (type t) -> struct let trans : t -> t = fun (x) -> x; end;"
+            , "module foo : (forallm t. sig val trans : t -> t; end) ->m sig type a = int; val f : a -> a; end"
+            , "  = functor (m) -> struct type a = int;"
+            , "      let f : a -> a = ((m @m a) ::m sig val trans : int -> int; end).trans; end;"
+            , "let result : int = box [impl = foo(|policy1|)] in (impl.f :: int -> int)(42);"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"
+
+    it "rejects module annotation with wrong sig" $ do
+      let input = unlines
+            [ "module policy1 = functor (type t) -> struct let id : t -> t = fun (x) -> x; end;"
+            , "module result = policy1 @m int ::m sig val id : bool -> bool; end;"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldBe` Nothing
+        _ -> expectationFailure "Expected Struct"
+
+    it "rejects functor checked against wrong ForallM sig" $ do
+      let m = desugarModule (parseModule (lexer "module m = functor (type a) -> struct let id : a -> a = fun (x) -> x; end;"))
+          mty = ForallM "a" (TySig [ValDecl "id" (TyArr (TyLit CoreFE.TyInt) (TyLit CoreFE.TyInt))])
+      case m of
+        D.Struct [D.ModStruct _ _ fm] -> checkMod [] fm mty `shouldBe` False
+        _ -> expectationFailure "Expected ModStruct"
+
+    it "infers full ACCESS_POLICY example (test12)" $ do
+      let input = unlines
+            [ "module type ACCESS_POLICY = forallm t. sig val reshape : list t -> list t; end;"
+            , "module previewPolicy : ACCESS_POLICY = functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> take(2, ls); end;"
+            , "module mockPolicy : ACCESS_POLICY = functor (type t) -> struct let reshape : list t -> list t = fun (ls) -> ls; end;"
+            , "module queryProcessor : (forallm t. sig val reshape : list t -> list t; end) ->m sig type a = int; val query : list a -> list a; end"
+            , "  = functor (policy) -> struct type a = int;"
+            , "      let query : list a -> list a = ((policy @m a) ::m sig val reshape : list int -> list int; end).reshape; end;"
+            , "let executeQuery : sig type a = int; val query : list a -> list a; end -> list int ="
+            , "  fun (processor) -> box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;"
+            , "let previewResult : list int = executeQuery(queryProcessor(|previewPolicy|));"
+            , "let mockResult : list int = executeQuery(queryProcessor(|mockPolicy|));"
+            ]
+      let m = desugarModule (parseModule (lexer input))
+      case m of
+        D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
+        _ -> expectationFailure "Expected Struct"

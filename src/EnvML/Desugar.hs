@@ -1,100 +1,114 @@
 module EnvML.Desugar (desugarModule, desugarExp) where
 
-import EnvML.Syntax
+import qualified EnvML.Syntax as Src
+import qualified EnvML.Desugared as D
 
-desugarModule :: Module -> Module
+desugarModule :: Src.Module -> D.Module
 desugarModule m = case m of
-  VarM n      -> VarM n
-  Functor as b -> Functor as (desugarModule b)
-  Struct ss   -> Struct (map desugarStructure ss)
-  MApp m1 m2  -> MApp (desugarModule m1) (desugarModule m2)
-  MAppt m1 t  -> MAppt (desugarModule m1) t
-  MAnno m1 mt -> MAnno (desugarModule m1) mt
+  Src.VarM n      -> D.VarM n
+  Src.Functor as b -> desugarFunctor as b
+  Src.Struct ss   -> D.Struct (reverse $ map desugarStructure ss)
+  Src.MApp m1 m2  -> D.MApp (desugarModule m1) (desugarModule m2)
+  Src.MAppt m1 t  -> D.MAppt (desugarModule m1) t
+  Src.MAnno m1 mt -> D.MAnno (desugarModule m1) mt
 
-desugarStructure :: Structure -> Structure
+-- | Multi-arg functor → nested single-arg functors
+desugarFunctor :: Src.FunArgs -> Src.Module -> D.Module
+desugarFunctor [] body = desugarModule body
+desugarFunctor ((name, arg) : rest) body =
+  D.Functor name arg (desugarFunctor rest body)
+
+desugarStructure :: Src.Structure -> D.Structure
 desugarStructure s = case s of
-  Let n mt e          -> Let n (fmap desugarTyp mt) (desugarExp e)
-  TypDecl n t         -> TypDecl n (desugarTypWithBinder (Just n) t)
-  ModTypDecl n mt     -> ModTypDecl n mt
-  ModStruct n mt m    -> ModStruct n mt (desugarModule m)
-  FunctStruct n as mt m -> FunctStruct n as mt (desugarModule m)
+  Src.Let n mt e          -> D.Let n (fmap desugarTyp mt) (desugarExp e)
+  Src.TypDecl n t         -> D.TypDecl n (desugarTypWithBinder (Just n) t)
+  Src.ModTypDecl n mt     -> D.ModTypDecl n mt
+  Src.ModStruct n mt m    -> D.ModStruct n mt (desugarModule m)
+  -- FunctStruct desugars into ModStruct with nested Functor body
+  Src.FunctStruct n as mt m -> D.ModStruct n mt (desugarFunctor as m)
 
-desugarExp :: Exp -> Exp
+desugarExp :: Src.Exp -> D.Exp
 desugarExp e = case e of
-  Lit l         -> Lit l
-  Var n         -> Var n
-  Fix n e1      -> Fix n (desugarExp e1)
-  If c t f      -> If (desugarExp c) (desugarExp t) (desugarExp f)
-  Lam as body   -> Lam as (desugarExp body)
-  TLam as body  -> TLam as (desugarExp body)
-  Clos env as body -> Clos (desugarEnv env) as (desugarExp body)
-  App e1 e2     -> App (desugarExp e1) (desugarExp e2)
-  TClos env as body -> TClos (desugarEnv env) as (desugarExp body)
-  TApp e1 t     -> TApp (desugarExp e1) t
-  Box env e1    -> Box (desugarEnv env) (desugarExp e1)
-  Rec fs        -> Rec [(n, desugarExp v) | (n, v) <- fs]
-  RProj e1 n    -> RProj (desugarExp e1) n
-  FEnv env      -> FEnv (desugarEnv env)
-  Anno e1 t     -> Anno (desugarExp e1) t
-  Mod m         -> Mod (desugarModule m)
+  Src.Lit l         -> D.Lit l
+  Src.Var n         -> D.Var n
+  Src.Fix n e1      -> D.Fix n (desugarExp e1)
+  Src.If c t f      -> D.If (desugarExp c) (desugarExp t) (desugarExp f)
+  -- Multi-arg lambdas → nested single-arg
+  Src.Lam as body   -> desugarLambda as body
+  Src.Clos env as body -> D.Clos (desugarEnv env) (desugarLambda as body)
+  Src.App e1 e2     -> D.App (desugarExp e1) (desugarExp e2)
+  Src.TClos env as body -> D.TClos (desugarEnv env) (desugarLambda as body)
+  Src.TApp e1 t     -> D.TApp (desugarExp e1) t
+  Src.Box env e1    -> D.Box (desugarEnv env) (desugarExp e1)
+  Src.Rec fs        -> D.Rec [(n, desugarExp v) | (n, v) <- fs]
+  Src.RProj e1 n    -> D.RProj (desugarExp e1) n
+  Src.FEnv env      -> D.FEnv (desugarEnv env)
+  Src.Anno e1 t     -> D.Anno (desugarExp e1) t
+  Src.Mod m         -> D.Mod (desugarModule m)
   -- Wrap constructor with fold
-  DataCon ctor arg ty -> Fold ty (DataCon ctor (desugarExp arg) ty)
+  Src.DataCon ctor arg ty -> D.Fold ty (D.DataCon ctor (desugarExp arg) ty)
   -- Wrap case scrutinee with unfold
-  Case scrut bs -> Case (Unfold (desugarExp scrut)) (map desugarBranch bs)
-  Fold t e1     -> Fold t (desugarExp e1)
-  Unfold e1     -> Unfold (desugarExp e1)
-  EList es      -> EList (map desugarExp es)
-  ETake i e1    -> ETake i (desugarExp e1)
-  BinOp op      -> BinOp (desugarBinOp op)
+  Src.Case scrut bs -> D.Case (D.Unfold (desugarExp scrut)) (map desugarBranch bs)
+  Src.Fold t e1     -> D.Fold t (desugarExp e1)
+  Src.Unfold e1     -> D.Unfold (desugarExp e1)
+  Src.EList es      -> D.EList (map desugarExp es)
+  Src.ETake i e1    -> D.ETake i (desugarExp e1)
+  Src.BinOp op      -> D.BinOp (desugarBinOp op)
 
-desugarBranch :: CaseBranch -> CaseBranch
-desugarBranch (CaseBranch ctor binder body) =
-  CaseBranch ctor binder (desugarExp body)
+-- | Multi-arg lambda → nested single-arg Lam/TLam
+desugarLambda :: Src.FunArgs -> Src.Exp -> D.Exp
+desugarLambda [] body = desugarExp body
+desugarLambda ((name, arg) : rest) body =
+  case arg of
+    Src.TyArg       -> D.TLam name (desugarLambda rest body)
+    Src.TmArg       -> D.Lam name Nothing (desugarLambda rest body)
+    Src.TmArgType t -> D.Lam name (Just (desugarTyp t)) (desugarLambda rest body)
 
-desugarBinOp :: BinOp -> BinOp
+desugarBranch :: Src.CaseBranch -> D.CaseBranch
+desugarBranch (Src.CaseBranch ctor binder body) =
+  D.CaseBranch ctor binder (desugarExp body)
+
+desugarBinOp :: Src.BinOp -> D.BinOp
 desugarBinOp op = case op of
-  Add e1 e2  -> Add (desugarExp e1) (desugarExp e2)
-  Sub e1 e2  -> Sub (desugarExp e1) (desugarExp e2)
-  Mul e1 e2  -> Mul (desugarExp e1) (desugarExp e2)
-  EqEq e1 e2 -> EqEq (desugarExp e1) (desugarExp e2)
-  Neq e1 e2  -> Neq (desugarExp e1) (desugarExp e2)
-  Lt e1 e2   -> Lt (desugarExp e1) (desugarExp e2)
-  Le e1 e2   -> Le (desugarExp e1) (desugarExp e2)
-  Gt e1 e2   -> Gt (desugarExp e1) (desugarExp e2)
-  Ge e1 e2   -> Ge (desugarExp e1) (desugarExp e2)
+  Src.Add e1 e2  -> D.Add (desugarExp e1) (desugarExp e2)
+  Src.Sub e1 e2  -> D.Sub (desugarExp e1) (desugarExp e2)
+  Src.Mul e1 e2  -> D.Mul (desugarExp e1) (desugarExp e2)
+  Src.EqEq e1 e2 -> D.EqEq (desugarExp e1) (desugarExp e2)
+  Src.Neq e1 e2  -> D.Neq (desugarExp e1) (desugarExp e2)
+  Src.Lt e1 e2   -> D.Lt (desugarExp e1) (desugarExp e2)
+  Src.Le e1 e2   -> D.Le (desugarExp e1) (desugarExp e2)
+  Src.Gt e1 e2   -> D.Gt (desugarExp e1) (desugarExp e2)
+  Src.Ge e1 e2   -> D.Ge (desugarExp e1) (desugarExp e2)
 
-desugarEnv :: Env -> Env
-desugarEnv = map desugarEnvE
+desugarEnv :: Src.Env -> D.Env
+desugarEnv = reverse . map desugarEnvE
 
-desugarEnvE :: EnvE -> EnvE
+desugarEnvE :: Src.EnvE -> D.EnvE
 desugarEnvE envE = case envE of
-  ExpEN n e   -> ExpEN n (desugarExp e)
-  ExpE e      -> ExpE (desugarExp e)
-  TypEN n t   -> TypEN n (desugarTyp t)
-  TypE t      -> TypE (desugarTyp t)
-  ModE n m    -> ModE n (desugarModule m)
-  ModTypE n t -> ModTypE n t
+  Src.ExpEN n e   -> D.ExpEN n (desugarExp e)
+  Src.ExpE e      -> D.ExpE (desugarExp e)
+  Src.TypEN n t   -> D.TypEN n (desugarTyp t)
+  Src.TypE t      -> D.TypE (desugarTyp t)
+  Src.ModE n m    -> D.ModE n (desugarModule m)
+  Src.ModTypE n t -> D.ModTypE n t
 
-desugarTyp :: Typ -> Typ
+desugarTyp :: Src.Typ -> Src.Typ
 desugarTyp = desugarTypWithBinder Nothing
 
-desugarTypWithBinder :: Maybe Name -> Typ -> Typ
+desugarTypWithBinder :: Maybe Src.Name -> Src.Typ -> Src.Typ
 desugarTypWithBinder mb ty = case ty of
-  TyLit l      -> TyLit l
-  TyVar n      -> TyVar n
-  TyArr a b    -> TyArr (desugarTypWithBinder mb a) (desugarTypWithBinder mb b)
-  TyAll n t    -> TyAll n (desugarTypWithBinder mb t)
-  TyBoxT ctx t -> TyBoxT ctx (desugarTypWithBinder mb t)
-  TyRcd fs     -> TyRcd [(n, desugarTypWithBinder mb t) | (n, t) <- fs]
-  TySum ctors  ->
+  Src.TyLit l      -> Src.TyLit l
+  Src.TyVar n      -> Src.TyVar n
+  Src.TyArr a b    -> Src.TyArr (desugarTypWithBinder mb a) (desugarTypWithBinder mb b)
+  Src.TyAll n t    -> Src.TyAll n (desugarTypWithBinder mb t)
+  Src.TyBoxT ctx t -> Src.TyBoxT (reverse ctx) (desugarTypWithBinder mb t)
+  Src.TyRcd fs     -> Src.TyRcd [(n, desugarTypWithBinder mb t) | (n, t) <- fs]
+  Src.TySum ctors  ->
     let ctors' = [(n, desugarTypWithBinder mb t) | (n, t) <- ctors]
     in case mb of
-      Just binder -> TyMu binder (TySum ctors')
-      Nothing     -> TySum ctors'
-  TyMu n t     -> TyMu n (desugarTypWithBinder (Just n) t)
-  TyCtx ctx    -> TyCtx ctx
-  TyModule mt  -> TyModule mt
-  TyList t     -> TyList (desugarTypWithBinder mb t)
-
-desugarCtors :: [(Name, Typ)] -> [(Name, Typ)]
-desugarCtors = map (\(n, t) -> (n, desugarTyp t))
+      Just binder -> Src.TyMu binder (Src.TySum ctors')
+      Nothing     -> Src.TySum ctors'
+  Src.TyMu n t     -> Src.TyMu n (desugarTypWithBinder (Just n) t)
+  Src.TyCtx ctx    -> Src.TyCtx (reverse ctx)
+  Src.TyModule mt  -> Src.TyModule mt
+  Src.TyList t     -> Src.TyList (desugarTypWithBinder mb t)
