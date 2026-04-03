@@ -10,5 +10,5 @@ module FUNC :
     ->m (sig val result : t; end)
   = functor (type t) (tag) (env) ->
       struct
-        let result = (tag @ t)(env);
+        let result = (tag @ t :: (sig val l : t; val r : t; end -> t))(env);
       end;

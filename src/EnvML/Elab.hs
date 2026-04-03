@@ -180,7 +180,7 @@ elabModTyp mty =
       CoreFE.TyVar name
 
 elabIntf :: EnvML.Intf -> CoreFE.TyEnv
-elabIntf = map elabIntfE
+elabIntf = map elabIntfE . reverse
 
 elabIntfE :: EnvML.IntfE -> CoreFE.TyEnvE
 elabIntfE ie =

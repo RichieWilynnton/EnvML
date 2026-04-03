@@ -7,6 +7,7 @@ import qualified EnvML.Parser.Lexer as Lexer
 import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
 import qualified EnvML.Desugar as Desugar
+import qualified EnvML.Desugared as D
 import qualified EnvML.Check as SCheck
 import qualified CoreFE.Named as CoreNamed
 import qualified CoreFE.DeBruijn as DeBruijn
@@ -67,7 +68,7 @@ runDesugarDetailed :: JSString -> IO JSString
 runDesugarDetailed = safeRun $ \input ->
     let ast       = parseModule input
         desugared = Desugar.desugarModule ast
-    in "=== Desugared AST ===\n\n" ++ AST.pretty desugared
+    in "=== Desugared AST ===\n\n" ++ D.prettyModule desugared
 
 -- | Stage 2b: Source Type Check (Detailed)
 foreign export javascript "runSourceCheckDetailed" runSourceCheckDetailed :: JSString -> IO JSString
@@ -77,7 +78,7 @@ runSourceCheckDetailed = safeRun $ \input ->
     let ast       = parseModule input
         desugared = Desugar.desugarModule ast
     in case desugared of
-        AST.Struct structs -> case SCheck.inferStructs [] structs of
+        D.Struct structs -> case SCheck.inferStructs [] structs of
             Nothing   -> "\10007 Source Type Error\n\nCould not infer types"
             Just intf -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyIntf intf
         _ -> case SCheck.inferMod [] desugared of
@@ -162,7 +163,7 @@ runDesugarSimplified :: JSString -> IO JSString
 runDesugarSimplified = safeRun $ \input ->
     let ast       = parseModule input
         desugared = Desugar.desugarModule ast
-    in "=== Desugared AST ===\n\n" ++ PW.prettyEnvMLModule desugared
+    in "=== Desugared AST ===\n\n" ++ D.prettyModule desugared
 
 -- | Stage 2b: Source Type Check (Simplified)
 foreign export javascript "runSourceCheckSimplified" runSourceCheckSimplified :: JSString -> IO JSString
@@ -172,7 +173,7 @@ runSourceCheckSimplified = safeRun $ \input ->
     let ast       = parseModule input
         desugared = Desugar.desugarModule ast
     in case desugared of
-        AST.Struct structs -> case SCheck.inferStructs [] structs of
+        D.Struct structs -> case SCheck.inferStructs [] structs of
             Nothing   -> "\10007 Source Type Error\n\nCould not infer types"
             Just intf -> "\10003 Source Type Check Passed\n\n" ++ AST.prettyIntf intf
         _ -> case SCheck.inferMod [] desugared of

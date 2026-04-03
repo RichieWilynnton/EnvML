@@ -633,7 +633,7 @@
       {
         id: "e0", label: "Policies as first-class modules",
         code: `module type ACCESS_POLICY = 
-  forall t. sig 
+  forallm t. sig 
     val reshape : list t -> list t; 
   end;
 
@@ -650,7 +650,7 @@ module mockPolicy : ACCESS_POLICY =
     end;
 
 module queryProcessor : 
-  (forall t. sig val reshape : list t -> list t; end)
+  (forallm t. sig val reshape : list t -> list t; end)
   ->m sig 
         type a = int; 
         val query : list a -> list a; 
@@ -658,7 +658,7 @@ module queryProcessor :
   = functor (policy) ->
       struct
         type a = int;
-        let query : list a -> list a = ((policy @a) :: sig val reshape : list int -> list int; end).reshape;
+        let query : list a -> list a = ((policy @m a) ::m sig val reshape : list int -> list int; end).reshape;
       end;
 
 let executeQuery : sig type a = int; val query : list a -> list a; end -> list int = 
@@ -666,30 +666,33 @@ let executeQuery : sig type a = int; val query : list a -> list a; end -> list i
     box [proc = processor] in proc.query(List[3, 1, 2]) :: list int;
 
 let previewResult : list int = 
-  executeQuery(queryProcessor(previewPolicy));
+  executeQuery(queryProcessor(|previewPolicy|));
 
 let mockResult : list int = 
-  executeQuery(queryProcessor(mockPolicy));
-`},
+  executeQuery(queryProcessor(|mockPolicy|));`
+      },
       {
         id: "e1", label: "Policy Functors",
         code: `module type POLICY = 
-  forall t. 
+  forallm t. 
     sig
       val trans : t -> t; 
     end;
+
 module policy1 : POLICY = 
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
     end;
+
 module policy2 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = fun (x) -> x;
     end;
+
 module foo : 
-  (forall t. sig val trans : t -> t; end) 
+  (forallm t. sig val trans : t -> t; end) 
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -698,30 +701,34 @@ module foo :
   = functor (m) ->
       struct
         type a = int;
-        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+        let f : a -> a = ((m @m a)::(sig val trans : int -> int; end)).trans;
       end;
-let result1 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);
-let result2 : int = box [impl = foo(policy1)] in (impl.f::int -> int)(42);`
+
+let result1 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);
+let result2 : int = box [impl = foo(|policy1|)] in (impl.f::int -> int)(42);`
       },
       {
         id: "e2", label: "Policy Composition",
         code: `module type POLICY = 
-  forall t. 
+  forallm t. 
     sig
       val trans : t -> t; 
     end;
+
 module policy1 : POLICY = 
   functor (type t) ->
     struct
       let trans : t -> t = (fun (x) -> x);
     end;
+
 module policy2 : POLICY =
   functor (type t) ->
     struct
       let trans : t -> t = fun (x) -> x;
     end;
+
 module foo : 
-  (forall t. sig val trans : t -> t; end) 
+  (forallm t. sig val trans : t -> t; end) 
   ->m ( sig
           type a = int;
           val f : a -> a;
@@ -730,12 +737,14 @@ module foo :
   = functor (m) ->
       struct
         type a = int;
-        let f : a -> a = ((m @ a)::(sig val trans : int -> int; end)).trans;
+        let f : a -> a = ((m @m a)::(sig val trans : int -> int; end)).trans;
       end;
+
 let comp : {f : int -> int, x: int} -> int = 
     fun (env) -> box [e = env] in e.f(e.x);
-let result1 : int = comp({f = foo(policy1).f, x = 42});
-let result2 : int = comp({f = foo(policy2).f, x = 42});`
+
+let result1 : int = comp({f = foo(|policy1|).f, x = 42});
+let result2 : int = comp({f = foo(|policy2|).f, x = 42});`
       },
       {
         id: "e3", label: "Module + Signature",
@@ -750,32 +759,35 @@ let z : int = x.res;`
         id: "e4", label: "Polymorphic Composition",
         code: `let comp : (forall a. {f : a -> a}) -> int -> int = 
     fun (env) (x) -> box [e = (env @int :: {f : int -> int}), x=42] in e.f(x);
+
 let f : int -> int  = comp(fun (type t) -> {f = (fun (x) -> x):: t -> t});
+
 let value : int = f(10);`
       },
       {
         id: "e5", label: "Box with Record Env",
-        code: `let comp : {f : int -> [int], x : int} -> [int] = 
+        code: `let comp : {f : int -> [a : int], x : int} -> [a : int] = 
     fun (env) -> box [e = env] in e.f(e.x);`
       },
       {
         id: "e6", label: "Left/Right with Signatures",
-        code: `let left : forall a. (sig val l : a; val r : a; end -> a) = 
+        code: `
+let left : forall a. (sig val l : a; val r : a; end -> a) = 
   fun (type t) (m) -> m.l;
 let right : forall a. (sig val l : a; val r : a; end -> a) = 
   fun (type t) (m) -> m.r;
+
 module FUNC :
-  forall t.
+  forallm t.
     (forall a. (sig val l : a; val r : a; end -> a))
     ->m (sig val l : t; val r : t; end)
     ->m (sig val result : t; end)
   = functor (type t) (tag) (env) ->
       struct
-        let result = 
-            (tag@t ::
-                (sig val l : t; val r : t; end -> t)
-            )(env);
-      end;`
+        let result = (tag @ t :: (sig val l : t; val r : t; end -> t))(env);
+      end;
+
+`
       },
       {
         id: "e7", label: "Left/Right with Records",
@@ -783,6 +795,7 @@ module FUNC :
   fun (type t) (m) -> m.l;
 let right : forall a. ({l : a, r : a} -> a) = 
   fun (type t) (m) -> m.r;
+
 let FUNC :
   forall t.
     (forall a. {l : a, r : a} -> a)
@@ -804,19 +817,24 @@ let z : bool = true;`
         id: "e9", label: "Polymorphic Field Access",
         code: `let f : forall a. {l : a} -> a = 
   fun (type t) (x) -> x.l;
+
 let result : ({l : int} -> int) = (f @ int);
+
 let final  : int = result({l = 1});`
       },
       {
         id: "e10", label: "Functor + Projection",
         code: `type a = int;
+
 module policy1 =
   functor (type t) ->
     struct
       let id : t -> t = (fun (x) -> x);
     end;
-let result = policy1 @a;
-let final = (result::(sig val id : a -> a; end)).id(1);`
+
+module result = policy1 @m a;
+
+let final = (result::m(sig val id : a -> a; end)).id(1);`
       },
       {
         id: "e11", label: "Module with Type Decl",
@@ -831,18 +849,16 @@ let final = (result::(sig val id : a -> a; end)).id(1);`
       },
       {
         id: "e12", label: "Fix Factorial",
-        code: ` let fact : int -> int -> int =
-	fun (p : int) -> fix f. fun (x : int) -> 
+        code: `let fact : int -> int -> int =
+        fun (p : int) -> fix f. fun (x : int) -> 
     (if x == 1 then 1 else (x * f(x - 1)) + p);
 
 let placeholder : int = 0; -- test interaction with bindings outside fix
-let result : int = fact(placeholder)(4);
-    `
+let result : int = fact(placeholder)(4);`
       },
       {
         id: "e13", label: "Sum types and case statements",
-        code: ` 
-type Shape = Square as int | Rect as {w : int, h : int};
+        code: `type Shape = Square as int | Rect as {w : int, h : int};
 
 let a = Square(2) as Shape;
 let b = Rect({w = 3, h = 4}) as Shape;
@@ -854,13 +870,26 @@ let area : Shape -> int =
     | <Rect=dim> => dim.w * dim.h;
 
 let resultA : int = area(a);
-let resultB : int = area(b);
-`
+let resultB : int = area(b);`
       },
       {
-        id: "e14", label: "STLC implementation",
-        code: ` 
-type ty =
+        id: "e14", label: "Recursive NatList",
+        code: `type NatList = Nil as int | Cons as NatList;
+
+let a = Nil(2) as NatList;
+let b = Cons(Nil(2) as NatList) as NatList;
+let c = Cons(b) as NatList;
+let getNum : NatList -> int = fix f. fun (l : NatList) -> (
+    case l of
+    | <Nil = x> => x
+    | <Cons = x> => f(x)
+);
+
+let res = getNum(c);`
+      },
+      {
+        id: "e15", label: "STLC implementation",
+        code: `type ty =
   TNat as unit
 | TBool as unit
 | TArrow as {arg : ty, ret : ty};
@@ -978,10 +1007,10 @@ let substExample = box [
 -- ***** human readable version *****
 -- target == (fun(y : nat) -> x(y)) (y)
 -- value == 42
- subst ("y") (value) (target);
+subst ("y") (value) (target);
 
 
----- ========== eval and check test ==========
+------ ========== eval and check test ==========
 let emptyTyCtx = CtxNil(0) as tyCtx;
 
 let checkExample = box [
@@ -1001,11 +1030,9 @@ let checkExample = box [
 -- ***** human readable version ******
 -- app2 == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
 [
-    {typeCheckRes = typeCheck (emptyTyCtx) (app2)},
-    {evalRes = eval (app2)}
-];
-
-`
+    typeCheckRes = typeCheck (emptyTyCtx) (app2),
+    evalRes = eval (app2)
+];`
       },
     ];
 
