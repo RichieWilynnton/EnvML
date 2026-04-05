@@ -3,6 +3,7 @@ module EnvML.Parse
   ( parseEmlFile
   , parseEmliFile
   , compileEmlFile
+  , collectImports
   , module EnvML.Syntax
   ) where
 

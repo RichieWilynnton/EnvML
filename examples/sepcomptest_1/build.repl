@@ -1,0 +1,8 @@
+-- sepcomptest_1: compile and link
+:sep-obj examples/sepcomptest_1/math.eml
+:sep-link examples/sepcomptest_1/math.emlo
+:sep-obj examples/sepcomptest_1/utils.eml
+:sep-link examples/sepcomptest_1/utils.emlo
+:sep-obj examples/sepcomptest_1/main.eml
+:sep-link examples/sepcomptest_1/main.emlo examples/sepcomptest_1/math.emle examples/sepcomptest_1/utils.emle
+:sep-eval examples/sepcomptest_1/main.emle
