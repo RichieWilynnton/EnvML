@@ -1,0 +1,160 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+module EnvML.ImportSpec (spec) where
+
+import EnvML.Syntax (Name, ModuleTyp(..), Intf, IntfE(..), Typ(..), FunArg(..))
+import qualified EnvML.Desugared as D
+import EnvML.Desugar (desugarModuleWithImports)
+import EnvML.Parse (compileEmlFile)
+import EnvML.Parser.Lexer (lexer)
+import EnvML.Parser.Parser (parseModule, parseModuleTyp)
+import qualified CoreFE.Syntax as CoreFE
+import Control.Exception (evaluate, SomeException, try)
+import Data.Maybe (isJust)
+import Test.Hspec
+
+-- ---------------------------------------------------------------------------
+-- Helpers
+-- ---------------------------------------------------------------------------
+
+pm :: String -> D.Module
+pm input = desugarModuleWithImports [] (parseModule (lexer input))
+
+pmt :: String -> ModuleTyp
+pmt input = parseModuleTyp (lexer input)
+
+-- | Parse a module string and apply importTypes via desugarModuleWithImports.
+pmWith :: [(Name, ModuleTyp)] -> String -> D.Module
+pmWith importTypes input =
+  desugarModuleWithImports importTypes (parseModule (lexer input))
+
+-- | Path helpers for example import files (relative to project root)
+singleImportFile :: FilePath
+singleImportFile = "examples/sepcomptest_0/main.eml"
+
+multiImportFile :: FilePath
+multiImportFile = "examples/sepcomptest_1/main.eml"
+
+-- ---------------------------------------------------------------------------
+-- Spec
+-- ---------------------------------------------------------------------------
+
+spec :: Spec
+spec = do
+
+  describe "Import parsing" $ do
+
+    it "parses a single import statement without error" $ do
+      let m = parseModule (lexer "import Foo;")
+      show m `shouldContain` "Import"
+
+    it "parses multiple import statements" $ do
+      let m = parseModule (lexer "import Foo;\nimport Bar;")
+      let src = show m
+      src `shouldContain` "\"Foo\""
+      src `shouldContain` "\"Bar\""
+
+    it "imports can appear before other definitions" $ do
+      let m = parseModule (lexer "import M;\nlet x : int = 1;")
+      show m `shouldContain` "Import"
+
+  describe "desugarModuleWithImports – no imports" $ do
+
+    it "desugars a struct without imports unchanged" $ do
+      let m = pmWith [] "let x : int = 1;"
+      case m of
+        D.Struct [D.Let "x" _ _] -> return ()
+        _ -> expectationFailure $ "Expected Struct [Let], got: " ++ show m
+
+    it "desugars multiple bindings without imports" $ do
+      let m = pmWith [] "let x : int = 1;\nlet y : int = 2;"
+      case m of
+        D.Struct structs -> length structs `shouldBe` 2
+        _ -> expectationFailure $ "Expected Struct, got: " ++ show m
+
+  describe "desugarModuleWithImports – single import" $ do
+
+    let mathSig :: ModuleTyp
+        mathSig = pmt "val add : int -> int -> int;\nval square : int -> int;"
+
+    it "wraps body in a single functor for one import" $ do
+      let m = pmWith [("math", mathSig)]
+                     "import math;\nlet r : int = math.square(3);"
+      case m of
+        D.Functor "math" _ (D.Struct _) -> return ()
+        _ -> expectationFailure $ "Expected Functor math -> Struct, got: " ++ show m
+
+    it "functor argument has TmArgType (sig ...)" $ do
+      let m = pmWith [("math", mathSig)]
+                     "import math;\nlet r : int = math.square(3);"
+      case m of
+        D.Functor _ (TmArgType (TyModule (TySig _))) _ -> return ()
+        _ -> expectationFailure $
+               "Expected TmArgType (TyModule (TySig _)), got: " ++ show m
+
+    it "body struct contains the let binding" $ do
+      let m = pmWith [("math", mathSig)]
+                     "import math;\nlet r : int = math.square(3);"
+      case m of
+        D.Functor _ _ (D.Struct structs) ->
+          length structs `shouldBe` 1
+        _ -> expectationFailure $ "Expected Functor -> Struct, got: " ++ show m
+
+  describe "desugarModuleWithImports – multiple imports" $ do
+
+    let mathSig :: ModuleTyp
+        mathSig = pmt "val add : int -> int -> int;\nval square : int -> int;"
+
+        utilsSig :: ModuleTyp
+        utilsSig = pmt "val greet : int -> int;\nval version : int;"
+
+    it "wraps body in nested functors (outermost = first import)" $ do
+      let m = pmWith [("math", mathSig), ("utils", utilsSig)]
+                     "import math;\nimport utils;\nlet r : int = 1;"
+      case m of
+        D.Functor "math" _ (D.Functor "utils" _ (D.Struct _)) -> return ()
+        _ -> expectationFailure $
+               "Expected Functor math -> Functor utils -> Struct, got: " ++ show m
+
+    it "fails with error when import has no matching emli entry" $ do
+      result <- (try $ evaluate $ length $ show $
+        pmWith [("math", mathSig)]      -- utils is missing
+               "import math;\nimport utils;\nlet r : int = 1;") :: IO (Either SomeException Int)
+      case result of
+        Left _ -> return ()     -- expected: error thrown
+        Right _ -> expectationFailure "Expected an error for missing .emli, but got success"
+
+  describe "compileEmlFile – single_import.eml" $ do
+
+    it "loads and parses the single-import example" $ do
+      m <- compileEmlFile singleImportFile
+      case m of
+        D.Functor "math" _ (D.Struct _) -> return ()
+        _ -> expectationFailure $
+               "Expected Functor math -> Struct, got: " ++ show m
+
+    it "functor type comes from math.emli" $ do
+      m <- compileEmlFile singleImportFile
+      case m of
+        D.Functor _ (TmArgType (TyModule (TySig intf))) _ -> do
+          let names = [n | ValDecl n _ <- intf]
+          names `shouldSatisfy` ("add" `elem`)
+          names `shouldSatisfy` ("square" `elem`)
+        _ -> expectationFailure $
+               "Expected functor with TySig from math.emli, got: " ++ show m
+
+  describe "compileEmlFile – multi_import.eml" $ do
+
+    it "loads and parses the multi-import example" $ do
+      m <- compileEmlFile multiImportFile
+      case m of
+        D.Functor "math" _ (D.Functor "utils" _ (D.Struct _)) -> return ()
+        _ -> expectationFailure $
+               "Expected Functor math -> Functor utils -> Struct, got: " ++ show m
+
+    it "body struct has all three let bindings" $ do
+      m <- compileEmlFile multiImportFile
+      case m of
+        D.Functor _ _ (D.Functor _ _ (D.Struct structs)) ->
+          length structs `shouldBe` 3
+        _ -> expectationFailure $
+               "Expected nested functors wrapping 3 bindings, got: " ++ show m

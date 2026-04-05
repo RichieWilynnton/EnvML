@@ -18,6 +18,7 @@ import qualified EnvML.Syntax as AST
 import qualified EnvML.Elab as Elab
 import qualified EnvML.Desugar as Desugar
 import qualified EnvML.Desugared as Desugared
+import qualified EnvML.Parse as Parse
 import qualified CoreFE.Named as CoreNamed
 import qualified CoreFE.Syntax as CoreFE
 import qualified CoreFE.Check as Check
@@ -68,6 +69,7 @@ processCommand cmd
   | Just path <- stripPrefix ":n " cmd     = cmdDeBruijn (trim path)
   | Just path <- stripPrefix ":check " cmd = cmdCheck (trim path)
   | Just path <- stripPrefix ":eval " cmd  = cmdEval (trim path)
+  | Just path <- stripPrefix ":comp " cmd  = cmdCompile (trim path)
   | Just path <- stripPrefix ":c " cmd     = cmdCheck (trim path)
   | Just path <- stripPrefix ":v " cmd     = cmdEval (trim path)
   | otherwise = putStrLn $ "Unknown command: " ++ cmd ++ "\nType :help for available commands."
@@ -85,6 +87,7 @@ printHelp = putStrLn $ unlines
   , "│  :n <file>     Parse → Desugar → Elaborate → De Bruijn          │"
   , "│  :check <file> Full pipeline → Type check → Print result       │"
   , "│  :eval <file>  Full pipeline → Evaluate → Print result         │"
+  , "│  :comp <file>  Resolve imports → Desugar → Print desugared     │"
   , "│  :c <file>     (shorthand for :check)                          │"
   , "│  :v <file>     (shorthand for :eval)                           │"
   , "│  :help, :h     Show this help                                  │"
@@ -207,3 +210,16 @@ cmdEval path = runPipeline path $ \ast -> do
     Just result -> do
       putStrLn "✓ Result:"
       putStrLn $ "  " ++ CoreFE.pretty result
+
+-- | Parse an .eml file, resolve imports from neighbouring .emli files, desugar.
+cmdCompile :: FilePath -> IO ()
+cmdCompile path = do
+  result <- (Right <$> Parse.compileEmlFile path) `Control.Exception.catch` handler
+  case result of
+    Left err      -> putStrLn $ "Error: " ++ err
+    Right desugared -> do
+      putStrLn "=== Compiled (imports resolved, desugared) ==="
+      putStrLn $ Desugared.prettyModule desugared
+  where
+    handler :: SomeException -> IO (Either String Desugared.Module)
+    handler e = return $ Left $ show e

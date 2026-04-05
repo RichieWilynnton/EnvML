@@ -1,4 +1,4 @@
-module EnvML.Desugar (desugarModule, desugarExp) where
+module EnvML.Desugar (desugarModule, desugarModuleWithImports, desugarExp) where
 
 import qualified EnvML.Syntax as Src
 import qualified EnvML.Desugared as D
@@ -26,6 +26,31 @@ desugarStructure s = case s of
   Src.ModStruct n mt m    -> D.ModStruct n mt (desugarModule m)
   -- FunctStruct desugars into ModStruct with nested Functor body
   Src.FunctStruct n as mt m -> D.ModStruct n mt (desugarFunctor as m)
+  Src.Import n -> error $ "Import '" ++ n ++ "' reached desugarStructure; it should've been desugared with desugarModuleWithImports before this point"
+
+-- | Desugar a module whose imports have been resolved to their interface types.
+-- Each 'Import M' in the top-level struct becomes the outermost functor parameter
+-- (M : <type from M.emli>), wrapping the remaining struct body.
+-- This should be called before all other desugar functions
+desugarModuleWithImports :: [(Src.Name, Src.ModuleTyp)] -> Src.Module -> D.Module
+desugarModuleWithImports importTypes m =
+  case m of
+    Src.Struct structs ->
+      let importNames = [n | Src.Import n <- structs]
+          rest        = filter (not . isImport) structs
+          body        = desugarModule (Src.Struct rest)
+      in foldr wrapFunctor body importNames
+    _ -> desugarModule m
+  where
+    isImport :: Src.Structure -> Bool
+    isImport (Src.Import _) = True
+    isImport _              = False
+
+    wrapFunctor :: Src.Name -> D.Module -> D.Module
+    wrapFunctor n acc =
+      case lookup n importTypes of
+        Just mty -> D.Functor n (Src.TmArgType (Src.TyModule mty)) acc
+        Nothing  -> error $ "No .emli file found for import: '" ++ n ++ "'"
 
 desugarExp :: Src.Exp -> D.Exp
 desugarExp e = case e of

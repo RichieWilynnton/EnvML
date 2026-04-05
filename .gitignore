@@ -27,6 +27,7 @@ rocq/Theories/Makefile
 rocq/Theories//Makefile.conf
 rocq/Theories//Makefile
 src/EnvML/Parser/Happy.info
+lean-sce/.lake
 
 *.vo
 *.vos
