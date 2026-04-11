@@ -57,6 +57,7 @@ data Exp
   | BinOp BinOp
   | DataCon String Exp
   | Case Exp [CaseBranch]
+  | Prim String 
   | -- List primitives
     EList [Exp] -- [e1, e2, e3]
   | ETake Int Exp -- take(n, ls)
@@ -278,6 +279,7 @@ stringOfExpI lvl (Fold t e) =
 stringOfExpI lvl (Unfold e) =
   "unfold " ++ stringOfExpI lvl e
 -- List expressions
+stringOfExpI _ (Prim name) = "#" ++ name
 stringOfExpI _lvl (EList []) = "List[]"
 stringOfExpI lvl (EList es) = "List[" ++ stringOfList (stringOfExpI lvl) es ++ "]"
 stringOfExpI lvl (ETake n ls) =
@@ -300,6 +302,7 @@ isSimpleExp (Rec _ e) = isSimpleExp e
 isSimpleExp (RProj e _) = isSimpleExp e
 isSimpleExp (EList es) = length es <= 3 && all isSimpleExp es
 isSimpleExp (DataCon _ e) = isSimpleExp e
+isSimpleExp (Prim _) = True
 isSimpleExp _ = False
 
 showEnvInline :: Env -> String
@@ -358,6 +361,7 @@ stringOfLiteral LitUnit = "()"
 expPrec :: Exp -> Int
 expPrec (Lit _) = 10
 expPrec (Var _) = 10
+expPrec (Prim _) = 10
 expPrec (FEnv _) = 10
 expPrec (Rec _ _) = 10
 expPrec (EList _) = 10

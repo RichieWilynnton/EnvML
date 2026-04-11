@@ -1,6 +1,8 @@
 module CoreFE.Eval where
 
 import CoreFE.Syntax
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.IO.Class (liftIO)
 
 lookupv :: Env -> Int -> Maybe Exp
 lookupv [] _ = Nothing
@@ -28,13 +30,23 @@ rlookupv (FEnv (_ : d)) l =
   rlookupv (FEnv d) l
 rlookupv _ _ = Nothing
 
-eval :: Env -> Exp -> Maybe Exp
+hoistMaybe :: (Monad m) => Maybe a -> MaybeT m a
+hoistMaybe = MaybeT . return
+
+eval :: Env -> Exp -> MaybeT IO Exp
 eval env = go
   where
     go (Lit n) = pure $ Lit n
-    go (Var n) = lookupv env n
+    go (Var n) = hoistMaybe $ lookupv env n
     go (Lam e) = pure $ Clos env e
     go e@(Clos _ _) = pure e
+    go (App (Prim "print") e2) = do
+      v <- eval env e2
+      liftIO $ putStrLn (pretty v)
+      pure $ Lit LitUnit
+    go (App (Prim "input") _) = do
+      line <- liftIO getLine
+      pure $ Lit (LitStr line)
     go (App e1 e2) = do
       Clos env' e <- eval env e1
       v2 <- eval env e2
@@ -64,7 +76,7 @@ eval env = go
     go (Rec l e) = Rec l <$> eval env e
     go (RProj e l) = do
       v <- eval env e
-      rlookupv v l
+      hoistMaybe $ rlookupv v l
     go (Fold t e) = do
       v <- eval env e
       pure (Fold t v)
@@ -72,7 +84,7 @@ eval env = go
       v <- eval env e
       case v of
         Fold _ inner -> pure inner
-        _ -> Nothing
+        _ -> hoistMaybe Nothing
     go (Anno e _) =
       eval env e
     go (Fix e) = do
@@ -118,12 +130,13 @@ eval env = go
       Lit (LitInt v1) <- eval env e1
       Lit (LitInt v2) <- eval env e2
       pure $ Lit (LitBool (v1 >= v2))
+    go (Prim n) = pure $ Prim n
     go (DataCon ctor arg) = do
       val <- eval env arg
       pure $ DataCon ctor val
     go (Case e branches) = do
       DataCon ctor payload <- eval env e
-      branchBody <- lookupCaseBranch ctor branches
+      branchBody <- hoistMaybe $ lookupCaseBranch ctor branches
       eval (ExpE payload : env) branchBody
     go (EList es) = do
         vs <- mapM (eval env) es
@@ -131,6 +144,9 @@ eval env = go
     go (ETake n e) = do
         EList vs <- eval env e
         pure $ EList (take n vs)
+
+runEval :: Env -> Exp -> IO (Maybe Exp)
+runEval env e = runMaybeT (eval env e)
 
 lookupCaseBranch :: String -> [CaseBranch] -> Maybe Exp
 lookupCaseBranch _ [] = Nothing

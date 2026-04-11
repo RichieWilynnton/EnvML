@@ -480,3 +480,26 @@ spec = do
       case m of
         D.Struct structs -> inferStructs [] structs `shouldSatisfy` isJust
         _ -> expectationFailure "Expected Struct"
+
+  describe "infer primitives" $ do
+    it "infers print as unit" $
+      infer [] (pe "print(42)") `shouldBe` Just (TyLit CoreFE.TyUnit)
+
+    it "infers print of string as unit" $
+      infer [] (pe "print(\"hello\")") `shouldBe` Just (TyLit CoreFE.TyUnit)
+
+    it "infers input as string" $
+      infer [] (pe "input()") `shouldBe` Just (TyLit CoreFE.TyStr)
+
+  describe "check primitives" $ do
+    it "checks print against unit" $
+      check [] (pe "print(42)") (TyLit CoreFE.TyUnit) `shouldBe` True
+
+    it "checks input against string" $
+      check [] (pe "input()") (TyLit CoreFE.TyStr) `shouldBe` True
+
+    it "input does not check against int" $
+      check [] (pe "input()") (TyLit CoreFE.TyInt) `shouldBe` False
+
+    it "input does not check against bool" $
+      check [] (pe "input()") (TyLit CoreFE.TyBool) `shouldBe` False

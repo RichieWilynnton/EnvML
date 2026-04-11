@@ -136,6 +136,7 @@ value (FEnv e) = lvalue e
 value (Rec _ v) = value v
 value (Fold _ v) = value v
 value (DataCon _ v) = value v
+value (Prim _) = True
 value (EList es) = all value es -- ADD THIS
 value _ = False
 
@@ -203,6 +204,11 @@ infer _ (Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (LitStr _) = TyStr
     inferLit LitUnit = TyUnit
 infer g (Var x) = getVar g x
+infer g (App (Prim "print") e2) = do
+  _ <- infer g e2
+  return (TyLit TyUnit)
+infer _ (App (Prim "input") _) =
+  pure (TyLit TyStr)
 infer g (App e1 e2) = do
   TyArr a b <- infer g e1
   guard (check g e2 a)
@@ -324,6 +330,11 @@ check g (DataCon ctor args) ty =
         Just payloadTy -> check g args payloadTy
         Nothing -> False
     Nothing -> False
+check g (App (Prim "print") e2) (TyLit TyUnit) =
+  case infer g e2 of
+    Just _  -> True
+    Nothing -> False
+check _ (App (Prim "input") _) (TyLit TyStr) = True
 check g (App e1 e2) tyB =
   case infer g e2 of
     Just tyA -> check g e1 (TyArr tyA tyB)

@@ -102,6 +102,7 @@ elabExp e =
       CoreFE.BinOp (CoreFE.Ge (elabExp e1) (elabExp e2))
     D.EList es -> CoreFE.EList (map elabExp es)
     D.ETake i e1 -> CoreFE.ETake i (elabExp e1)
+    D.Prim n -> CoreFE.Prim n
 
 elabRecords :: [(EnvML.Name, D.Exp)] -> [CoreFE.Exp]
 elabRecords [] = []

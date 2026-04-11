@@ -5,15 +5,19 @@ import qualified CoreFE.Named as Named
 import qualified CoreFE.Syntax as Nameless
 import CoreFE.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
 import CoreFE.Check (check, infer)
-import CoreFE.Eval (eval)
+import CoreFE.Eval (runEval)
 
 -- Helper to run full pipeline
-runPipeline :: Named.Exp -> Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp)
+runPipeline :: Named.Exp -> IO (Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp))
 runPipeline namedExp = do
   let namelessExp = toDeBruijn namedExp
-  typ <- infer [] namelessExp
-  result <- eval [] namelessExp
-  return (namelessExp, typ, result)
+  case infer [] namelessExp of
+    Nothing -> return Nothing
+    Just typ -> do
+      result <- runEval [] namelessExp
+      case result of
+        Nothing -> return Nothing
+        Just val -> return $ Just (namelessExp, typ, val)
 
 -- ============================================================================
 -- Test Data
@@ -537,8 +541,9 @@ spec = do
         
         case expectedResult of
           Just result ->
-            it "evaluates correctly" $
-              eval [] (toDeBruijn namedExp) `shouldBe` Just result
+            it "evaluates correctly" $ do
+              res <- runEval [] (toDeBruijn namedExp)
+              res `shouldBe` Just result
           Nothing ->
             it "evaluation not expected (skipped)" $
               True `shouldBe` True  -- trivial assertion

@@ -143,6 +143,11 @@ infer _ (D.Lit lit) = pure $ TyLit $ inferLit lit
     inferLit (CoreFE.LitStr _) = CoreFE.TyStr
     inferLit CoreFE.LitUnit = CoreFE.TyUnit
 infer g (D.Var x) = getVar g x
+infer g (D.App (D.Prim "print") e2) = do
+  _ <- infer g e2
+  return (TyLit CoreFE.TyUnit)
+infer _ (D.App (D.Prim "input") _) =
+  return (TyLit CoreFE.TyStr)
 infer g (D.App e1 e2) = do
   TyArr a b <- infer g e1
   guard (check g e2 a)

@@ -93,6 +93,7 @@ desugarExp e = case e of
   Src.Unfold e1     -> D.Unfold (desugarExp e1)
   Src.EList es      -> D.EList (map desugarExp es)
   Src.ETake i e1    -> D.ETake i (desugarExp e1)
+  Src.Prim n        -> D.Prim n
   Src.BinOp op      -> D.BinOp (desugarBinOp op)
 
 -- | Multi-arg lambda → nested single-arg Lam/TLam

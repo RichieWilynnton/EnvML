@@ -1,6 +1,6 @@
 module CoreFE.CoreFESpec (spec) where
 
-import CoreFE.Eval (eval)
+import CoreFE.Eval (runEval)
 import CoreFE.Check (infer, check, teq)
 import CoreFE.Syntax
 import CoreFE.Parser.Lexer (lexer)
@@ -17,10 +17,10 @@ pTyp = parseTyp . lexer
 pEnv :: String -> TyEnv
 pEnv = parseEnv . lexer
 
-eval0 :: Exp -> Maybe Exp
-eval0 = eval []
+eval0 :: Exp -> IO (Maybe Exp)
+eval0 = runEval []
 
-evalP :: String -> Maybe Exp
+evalP :: String -> IO (Maybe Exp)
 evalP = eval0 . pExp
 
 inferP :: String -> Maybe Typ
@@ -746,7 +746,8 @@ spec = do
               , CaseBranch "_" (Lit (LitInt 0))
               ]
       infer [] expr `shouldBe` Just (TyLit TyInt)
-      eval [] expr `shouldBe` Just (Lit (LitInt 0))
+      result <- runEval [] expr
+      result `shouldBe` Just (Lit (LitInt 0))
 
     it "types explicit unfold of recursive function type at application" $ do
       let muArrow = TyMu (TyArr (TyLit TyInt) (TyLit TyInt))
@@ -754,10 +755,24 @@ spec = do
       let expr = App (Unfold funVal) (Lit (LitInt 1))
       check [] expr (TyLit TyInt) `shouldBe` True
 
+  describe "input primitive" $ do
+    it "infers input as String" $
+      infer [] (App (Prim "input") (Lit LitUnit))
+        `shouldBe` Just (TyLit TyStr)
+
+    it "checks input against String" $
+      check [] (App (Prim "input") (Lit LitUnit)) (TyLit TyStr)
+        `shouldBe` True
+
+    it "does not check input against Int" $
+      check [] (App (Prim "input") (Lit LitUnit)) (TyLit TyInt)
+        `shouldBe` False
+
   where
     mkEvalTest (name, src, expected) =
-      it name $
-        evalP src `shouldBe` expected
+      it name $ do
+        result <- evalP src
+        result `shouldBe` expected
 
     mkCheckTest (name, expr, typ, expected) =
       it name $

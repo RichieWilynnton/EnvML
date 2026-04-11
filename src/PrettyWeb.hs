@@ -118,6 +118,7 @@ prettyNamedExpShort (Named.Case _ _) = "case ... of ..."
 prettyNamedExpShort (Named.BinOp _) = "..."
 prettyNamedExpShort (Named.EList es) = foldr (\e acc -> acc ++ prettyNamedExpShort e ++ ",") "" es
 prettyNamedExpShort (Named.ETake i e) = "take(" ++ show i ++ "," ++ prettyNamedExpShort e ++ ")"
+prettyNamedExpShort (Named.Prim name) = "#" ++ name
 
 
 prettyNamedEnvShort :: Named.Env -> String
@@ -177,6 +178,7 @@ prettyDeBruijnExpShort (CoreFE.If {}) = "if ... then ... else ..."
 prettyDeBruijnExpShort (CoreFE.BinOp op) = prettyDeBruijnBinOpShort op
 prettyDeBruijnExpShort (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExpShort (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExpShort (CoreFE.Prim name) = "#" ++ name
 
 
 prettyDeBruijnBinOpShort :: CoreFE.BinOp -> String
@@ -233,6 +235,7 @@ prettyDeBruijnExp (CoreFE.If e1 e2 e3) = "if " ++ prettyDeBruijnExp e1 ++ " then
 prettyDeBruijnExp (CoreFE.BinOp op) = prettyDeBruijnBinOp op
 prettyDeBruijnExp (CoreFE.EList es) = foldr (\e acc -> acc ++ prettyDeBruijnExpShort e ++ ",") "" es
 prettyDeBruijnExp (CoreFE.ETake i e) = "take(" ++ show i ++ "," ++ prettyDeBruijnExpShort e ++ ")"
+prettyDeBruijnExp (CoreFE.Prim name) = "#" ++ name
 
 
 prettyDeBruijnBinOp :: CoreFE.BinOp -> String

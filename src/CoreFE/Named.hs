@@ -34,6 +34,7 @@ data Exp
   | Unfold Exp
   | DataCon Name Exp
   | Case Exp [CaseBranch]
+  | Prim   String       -- built-in primitive (e.g. "print")
   -- List primitives
   | EList  [Exp]        -- [e1, e2, e3]
   | ETake  Int Exp      -- take(n, ls)
@@ -177,6 +178,7 @@ prettyExp (Unfold e) = "unfold " ++ prettyExp e
 prettyExp (DataCon ctor arg) = ctor ++ "(" ++ prettyExp arg ++ ")"
 prettyExp (Case e branches) =
   "case " ++ prettyExp e ++ " of " ++ intercalate " | " (map prettyCaseBranch branches)
+prettyExp (Prim name) = "#" ++ name
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalate ", " (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
@@ -192,6 +194,7 @@ needsParenExp (BinOp _) = True
 needsParenExp (Anno _ _) = True
 needsParenExp (Fold _ _) = True
 needsParenExp (Unfold _) = True
+needsParenExp (Prim _) = False
 needsParenExp _ = False
 
 needsParenProj :: Exp -> Bool

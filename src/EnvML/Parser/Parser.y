@@ -54,6 +54,8 @@ import Data.Char (isUpper)
   list      { TokList }
   List      { TokListE }
   unit      { TokUnit }
+  print     { TokPrint }
+  input     { TokInput }
   '='       { TokEq }
   ':'       { TokColon }
   ';'       { TokSemi }
@@ -184,6 +186,8 @@ Term :: { Exp }
   : Term '(' Exp ')'     { App $1 $3 }
   | Term '@' Typ         { TApp $1 $3 }
   | Term '.' id          { RProj $1 $3 }
+  | print '(' Exp ')'    { App (Prim "print") $3 }
+  | input '(' ')'        { App (Prim "input") (Lit CoreFE.LitUnit) }
   | Atom                 { $1 }
 
 Atom :: { Exp }

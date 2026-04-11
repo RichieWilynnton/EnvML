@@ -48,6 +48,8 @@ tokens :-
   list        { \_ -> TokList }
   List        { \_ -> TokListE }
   unit        { \_ -> TokUnit }
+  print       { \_ -> TokPrint }
+  input       { \_ -> TokInput }
 
   -- Symbols
   "=="        { \_ -> TokEqEq     }
@@ -130,6 +132,8 @@ data Token
   | TokList
   | TokListE
   | TokUnit
+  | TokPrint
+  | TokInput
   -- Symbol Tokens
   | TokEq
   | TokColon    

@@ -42,7 +42,8 @@ library
                       configurator,
                       bytestring,
                       binary,
-                      mtl
+                      mtl,
+                      transformers
     
     ghc-options:      -Wall
     default-language: Haskell2010

@@ -138,6 +138,8 @@ toNamelessExp eNames tNames e =
       Nameless.EList (map (toNamelessExp eNames tNames) es)
     (Named.ETake i e1)    ->
       Nameless.ETake i (toNamelessExp eNames tNames e1)
+    (Named.Prim n)        ->
+      Nameless.Prim n
 
 envToExpNames ::
   Named.Env

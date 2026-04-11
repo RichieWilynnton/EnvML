@@ -1,0 +1,2 @@
+let x : string = input();
+let y = print(x);

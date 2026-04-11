@@ -120,11 +120,12 @@ runCheckDetailed = safeRun $ \input ->
 foreign export javascript "runEvalDetailed" runEvalDetailed :: JSString -> IO JSString
 
 runEvalDetailed :: JSString -> IO JSString
-runEvalDetailed = safeRun $ \input ->
+runEvalDetailed = safeRunIO $ \input -> do
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
-    in case Eval.eval [] coreNameless of
+    result <- Eval.runEval [] coreNameless
+    return $ case result of
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Evaluation Result\n\n" ++ CoreFE.pretty res
 
@@ -132,17 +133,18 @@ runEvalDetailed = safeRun $ \input ->
 foreign export javascript "runFullDetailed" runFullDetailed :: JSString -> IO JSString
 
 runFullDetailed :: JSString -> IO JSString
-runFullDetailed = safeRun $ \input ->
+runFullDetailed = safeRunIO $ \input -> do
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
         typeResult = case Check.infer [] coreNameless of
-            Nothing  -> "✗ Type Error: Could not infer type"
-            Just typ -> "✓ Types:\n" ++ CoreFE.pretty typ
-        evalResult = case Eval.eval [] coreNameless of
-            Nothing  -> "✗ Evaluation Error: Got stuck"
-            Just res -> "✓ Values:\n" ++ CoreFE.pretty res
-    in typeResult ++ "\n\n" ++ evalResult
+            Nothing  -> "\10007 Type Error: Could not infer type"
+            Just typ -> "\10003 Types:\n" ++ CoreFE.pretty typ
+    evalResult <- Eval.runEval [] coreNameless
+    let evalStr = case evalResult of
+            Nothing  -> "\10007 Evaluation Error: Got stuck"
+            Just res -> "\10003 Values:\n" ++ CoreFE.pretty res
+    return $ typeResult ++ "\n\n" ++ evalStr
 
 -------------------------------------------------------------------------------
 -- EnvML Pipeline Stages - SIMPLIFIED (using PrettyWeb)
@@ -215,11 +217,12 @@ runCheckSimplified = safeRun $ \input ->
 foreign export javascript "runEvalSimplified" runEvalSimplified :: JSString -> IO JSString
 
 runEvalSimplified :: JSString -> IO JSString
-runEvalSimplified = safeRun $ \input ->
+runEvalSimplified = safeRunIO $ \input -> do
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
-    in case Eval.eval [] coreNameless of
+    result <- Eval.runEval [] coreNameless
+    return $ case result of
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Evaluation Result\n\n" ++ PW.prettyEvalResult res
 
@@ -227,17 +230,18 @@ runEvalSimplified = safeRun $ \input ->
 foreign export javascript "runFullSimplified" runFullSimplified :: JSString -> IO JSString
 
 runFullSimplified :: JSString -> IO JSString
-runFullSimplified = safeRun $ \input ->
+runFullSimplified = safeRunIO $ \input -> do
     let ast           = parseModule input
         coreNamed     = elaborate ast
         coreNameless  = toDeBruijn coreNamed
         typeResult = case Check.infer [] coreNameless of
-            Nothing  -> "✗ Type Error: Could not infer type"
-            Just typ -> "✓ Types:\n" ++ PW.prettyCheckResult typ
-        evalResult = case Eval.eval [] coreNameless of
-            Nothing  -> "✗ Evaluation Error: Got stuck"
-            Just res -> "✓ Values:\n" ++ PW.prettyEvalResult res
-    in typeResult ++ "\n" ++ evalResult
+            Nothing  -> "\10007 Type Error: Could not infer type"
+            Just typ -> "\10003 Types:\n" ++ PW.prettyCheckResult typ
+    evalResult <- Eval.runEval [] coreNameless
+    let evalStr = case evalResult of
+            Nothing  -> "\10007 Evaluation Error: Got stuck"
+            Just res -> "\10003 Values:\n" ++ PW.prettyEvalResult res
+    return $ typeResult ++ "\n" ++ evalStr
 
 -------------------------------------------------------------------------------
 -- CoreFE Calculus Direct Functions - DETAILED
@@ -265,9 +269,10 @@ coreCheckDetailed = safeRun $ \input ->
 foreign export javascript "coreEvalDetailed" coreEvalDetailed :: JSString -> IO JSString
 
 coreEvalDetailed :: JSString -> IO JSString
-coreEvalDetailed = safeRun $ \input ->
+coreEvalDetailed = safeRunIO $ \input -> do
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
-    in case Eval.eval [] expr of
+    result <- Eval.runEval [] expr
+    return $ case result of
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Result\n\n  " ++ CoreFE.pretty res
 
@@ -275,15 +280,16 @@ coreEvalDetailed = safeRun $ \input ->
 foreign export javascript "coreRunDetailed" coreRunDetailed :: JSString -> IO JSString
 
 coreRunDetailed :: JSString -> IO JSString
-coreRunDetailed = safeRun $ \input ->
+coreRunDetailed = safeRunIO $ \input -> do
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
         typeStr = case Check.infer [] expr of
-            Nothing  -> "✗ Type Error: Could not infer type"
+            Nothing  -> "\10007 Type Error: Could not infer type"
             Just typ -> "Type   : " ++ CoreFE.pretty typ
-        evalStr = case Eval.eval [] expr of
-            Nothing  -> "✗ Eval Error: Got stuck"
+    evalResult <- Eval.runEval [] expr
+    let evalStr = case evalResult of
+            Nothing  -> "\10007 Eval Error: Got stuck"
             Just res -> "Result : " ++ CoreFE.pretty res
-    in typeStr ++ "\n" ++ evalStr
+    return $ typeStr ++ "\n" ++ evalStr
 
 -------------------------------------------------------------------------------
 -- CoreFE Calculus Direct Functions - SIMPLIFIED
@@ -350,9 +356,10 @@ coreCheckSimplified = safeRun $ \input ->
 foreign export javascript "coreEvalSimplified" coreEvalSimplified :: JSString -> IO JSString
 
 coreEvalSimplified :: JSString -> IO JSString
-coreEvalSimplified = safeRun $ \input ->
+coreEvalSimplified = safeRunIO $ \input -> do
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
-    in case Eval.eval [] expr of
+    result <- Eval.runEval [] expr
+    return $ case result of
         Nothing  -> "✗ Evaluation Error\n\nEvaluation got stuck"
         Just res -> "✓ Result\n\n  " ++ PW.prettyValueShort res
 
@@ -360,15 +367,16 @@ coreEvalSimplified = safeRun $ \input ->
 foreign export javascript "coreRunSimplified" coreRunSimplified :: JSString -> IO JSString
 
 coreRunSimplified :: JSString -> IO JSString
-coreRunSimplified = safeRun $ \input ->
+coreRunSimplified = safeRunIO $ \input -> do
     let expr = CoreParser.parseExp (CoreLexer.lexer input)
         typeStr = case Check.infer [] expr of
-            Nothing  -> "✗ Type Error: Could not infer type"
+            Nothing  -> "\10007 Type Error: Could not infer type"
             Just typ -> "Type   : " ++ PW.prettyDeBruijnTyp typ
-        evalStr = case Eval.eval [] expr of
-            Nothing  -> "✗ Eval Error: Got stuck"
+    evalResult <- Eval.runEval [] expr
+    let evalStr = case evalResult of
+            Nothing  -> "\10007 Eval Error: Got stuck"
             Just res -> "Result : " ++ PW.prettyValueShort res
-    in typeStr ++ "\n" ++ evalStr
+    return $ typeStr ++ "\n" ++ evalStr
 
 -------------------------------------------------------------------------------
 -- Helper
@@ -379,5 +387,13 @@ safeRun f input = do
     let inputStr = fromJSString input
     result <- catch
         (evaluate $! f inputStr)
+        (\(e :: SomeException) -> return $ "Error: " ++ show e)
+    return $ toJSString result
+
+safeRunIO :: (String -> IO String) -> JSString -> IO JSString
+safeRunIO f input = do
+    let inputStr = fromJSString input
+    result <- catch
+        (f inputStr)
         (\(e :: SomeException) -> return $ "Error: " ++ show e)
     return $ toJSString result

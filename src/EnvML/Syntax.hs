@@ -109,6 +109,7 @@ data Exp
   | Fold  Typ Exp            -- fold(e) as T
   | Unfold Exp               -- unfold(e)
   -- Lists
+  | Prim  Name              -- built-in primitive (e.g. "print")
   | EList [Exp]             -- [e1, e2, e3]
   | ETake Int Exp           -- take(n, ls)
   -- Extensions
@@ -164,6 +165,7 @@ expPrec e = case e of
   Case {}   -> 1
   Fold _ _  -> 3
   Unfold _  -> 3
+  Prim _    -> 5
   EList _   -> 5
   ETake _ _ -> 5
   _ -> 4 -- TODO: Extensions
@@ -389,6 +391,7 @@ prettyExp (Fold t e) = "fold(" ++ prettyExp e ++ ") as " ++ prettyTyp t
 prettyExp (Unfold e) = "unfold(" ++ prettyExp e ++ ")"
 prettyExp (Case e branches) =
   "case " ++ prettyExp e ++ " of " ++ intercalateWith " " (map (("| " ++) . prettyCaseBranch) branches)
+prettyExp (Prim name) = "prim " ++ name
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"

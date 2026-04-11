@@ -245,7 +245,8 @@ cmdEval path = runPipeline path $ \ast -> do
     Just typ -> putStrLn $ "Type: " ++ CoreFE.pretty typ
   
   putStrLn "=== Evaluation ==="
-  case Eval.eval [] coreNameless of
+  evalResult <- Eval.runEval [] coreNameless
+  case evalResult of
     Nothing -> putStrLn "✗ Evaluation failed"
     Just result -> do
       putStrLn "✓ Result:"
@@ -386,7 +387,8 @@ cmdSepEval path = do
     Right contents -> do
       let expr = read contents :: CoreFE.Exp
       putStrLn "=== Sep: Evaluation ==="
-      case Eval.eval [] expr of
+      evalResult <- Eval.runEval [] expr
+      case evalResult of
         Nothing  -> putStrLn "\x2717 Evaluation failed"
         Just val -> putStrLn "\x2713 Result:" >> putStrLn ("  " ++ CoreFE.pretty val)
   where

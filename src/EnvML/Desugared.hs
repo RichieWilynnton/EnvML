@@ -57,6 +57,7 @@ data Exp
   | Case    Exp [CaseBranch]
   | Fold    Typ Exp
   | Unfold  Exp
+  | Prim    Name
   | EList   [Exp]
   | ETake   Int Exp
   | BinOp   BinOp
@@ -106,6 +107,7 @@ prettyExp (Case e branches) =
   "case " ++ prettyExp e ++ " of " ++ unwords (map (("| " ++) . prettyCaseBranch) branches)
 prettyExp (Fold t e) = "fold(" ++ prettyExp e ++ ") as " ++ Src.prettyTyp t
 prettyExp (Unfold e) = "unfold(" ++ prettyExp e ++ ")"
+prettyExp (Prim name) = "prim " ++ name
 prettyExp (EList []) = "List[]"
 prettyExp (EList es) = "List[" ++ intercalateComma (map prettyExp es) ++ "]"
 prettyExp (ETake n ls) = "take(" ++ show n ++ ", " ++ prettyExp ls ++ ")"
