@@ -143,6 +143,8 @@ prettyDeBruijnModule e = prettyDeBruijnExp e
 prettyDeBruijnBinding :: CoreFE.EnvE -> String
 prettyDeBruijnBinding (CoreFE.TypE t) = 
     "type " ++ prettyDeBruijnTyp t
+prettyDeBruijnBinding (CoreFE.TypEN n t) = 
+    "type " ++ n ++ " = " ++ prettyDeBruijnTyp t
 prettyDeBruijnBinding (CoreFE.ExpE e) = prettyDeBruijnBindingExp e
 prettyDeBruijnBinding (CoreFE.RecE _) = "<recursive-binding>"
 
@@ -202,6 +204,7 @@ prettyDeBruijnEnvShort env
     shortEntry (CoreFE.ExpE _) = "_"
     shortEntry (CoreFE.RecE _) = "rec"
     shortEntry (CoreFE.TypE _) = "type"
+    shortEntry (CoreFE.TypEN n _) = "type " ++ n
 
 needsParenCore :: CoreFE.Exp -> Bool
 needsParenCore (CoreFE.App _ _) = True
@@ -258,6 +261,7 @@ prettyDeBruijnEnvE (CoreFE.ExpE (CoreFE.Rec l e)) = l ++ " = " ++ prettyDeBruijn
 prettyDeBruijnEnvE (CoreFE.ExpE e) = prettyDeBruijnExp e
 prettyDeBruijnEnvE (CoreFE.RecE _) = "<rec>"
 prettyDeBruijnEnvE (CoreFE.TypE t) = "type " ++ prettyDeBruijnTyp t
+prettyDeBruijnEnvE (CoreFE.TypEN n t) = "type " ++ n ++ " = " ++ prettyDeBruijnTyp t
 
 prettyDeBruijnTyp :: CoreFE.Typ -> String
 prettyDeBruijnTyp (CoreFE.TyLit l) = prettyTyLit l
@@ -277,6 +281,7 @@ prettyDeBruijnTyp (CoreFE.TySum ctors) =
     prettyCtor (ctor, ty) = ctor ++ " : " ++ prettyDeBruijnTyp ty
 prettyDeBruijnTyp (CoreFE.TyEnvt env) = "Env[" ++ prettyDeBruijnTyEnv env ++ "]"
 prettyDeBruijnTyp (CoreFE.TyList es) = "list " ++ prettyDeBruijnTyp es
+prettyDeBruijnTyp (CoreFE.TyProj i l) = "x" ++ show i ++ "." ++ l
 
 prettyDeBruijnTyEnv :: CoreFE.TyEnv -> String
 prettyDeBruijnTyEnv [] = ""
@@ -286,6 +291,7 @@ prettyDeBruijnTyEnvE :: CoreFE.TyEnvE -> String
 prettyDeBruijnTyEnvE (CoreFE.Type t) = prettyDeBruijnTyp t
 prettyDeBruijnTyEnvE CoreFE.Kind = "*"
 prettyDeBruijnTyEnvE (CoreFE.TypeEq t) = "= " ++ prettyDeBruijnTyp t
+prettyDeBruijnTyEnvE (CoreFE.TypeDef n t) = "type " ++ n ++ " = " ++ prettyDeBruijnTyp t
 
 isArrowCore :: CoreFE.Typ -> Bool
 isArrowCore (CoreFE.TyArr _ _) = True
@@ -299,6 +305,7 @@ prettyCheckResult (CoreFE.TyEnvt env) =
     prettyTypeBinding (CoreFE.Type t) = formatTypeEntry t
     prettyTypeBinding CoreFE.Kind = "  * (kind)"
     prettyTypeBinding (CoreFE.TypeEq t) = "  type = " ++ prettyDeBruijnTyp t
+    prettyTypeBinding (CoreFE.TypeDef n t) = "  type " ++ n ++ " = " ++ prettyDeBruijnTyp t
     
     formatTypeEntry :: CoreFE.Typ -> String
     formatTypeEntry (CoreFE.TyRcd label t) = "  " ++ label ++ " : " ++ prettyDeBruijnTyp t
@@ -311,6 +318,7 @@ prettyEvalResult (CoreFE.FEnv env) =
   where
     formatBinding :: CoreFE.EnvE -> String
     formatBinding (CoreFE.TypE t) = "  type " ++ prettyDeBruijnTyp t
+    formatBinding (CoreFE.TypEN n t) = "  type " ++ n ++ " = " ++ prettyDeBruijnTyp t
     formatBinding (CoreFE.ExpE e) = formatExpBinding e
     formatBinding (CoreFE.RecE _) = "  <recursive-binding>"
     

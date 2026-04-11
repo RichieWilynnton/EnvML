@@ -53,6 +53,7 @@ data Typ
   | TyCtx     TyCtx           -- [t : A, t1 : Type, t2 : A=]
   | TyModule  ModuleTyp       -- Note: First-class modules
   | TyList    Typ             -- [A]
+  | TyProj    Typ Name        -- A.l (type projection)
   deriving (Show, Eq)
 
 data Module
@@ -140,6 +141,7 @@ typPrec t = case t of
   TyCtx _     -> 4
   TyModule _  -> 4
   TyList _    -> 4
+  TyProj _ _  -> 4
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
@@ -309,6 +311,7 @@ prettyTyp (TySum ctors) =
 prettyTyp (TyMu n t) = "mu " ++ n ++ ". " ++ prettyTyp t
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
+prettyTyp (TyProj t l) = prettyTyp t ++ "." ++ l
 
 prettyCtorSpec :: (Name, Typ) -> String
 prettyCtorSpec (ctor, ty) = ctor ++ " as " ++ prettyTyp ty

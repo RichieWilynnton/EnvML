@@ -10,6 +10,7 @@ keyLen [] = 0
 keyLen (Type _ : bs) = keyLen bs
 keyLen (Kind : bs) = 1 + keyLen bs
 keyLen (TypeEq _ : bs) = 1 + keyLen bs
+keyLen (TypeDef _ _ : bs) = 1 + keyLen bs
 
 -- | Type shifting
 tshift :: Int -> Typ -> Typ
@@ -23,7 +24,8 @@ tshift x (TyRcd l a) = TyRcd l (tshift x a)
 tshift x (TyEnvt bs) = TyEnvt (tshiftBinds x bs)
 tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
 tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
-tshift x (TyMu t) = TyMu (tshift (1 + x) t) 
+tshift x (TyMu t) = TyMu (tshift (1 + x) t)
+tshift _ t@(TyProj _ _) = t -- expression indices don't shift with type shifts
 
 -- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
 typeSubst :: Typ -> Int -> Typ -> Typ
@@ -41,12 +43,15 @@ typeSubst s i (TyRcd l a) = TyRcd l (typeSubst s i a)
 typeSubst s i (TyEnvt bs) = TyEnvt (tyEnvSubst s i bs)
 typeSubst s i (TyList a) = TyList (typeSubst s i a)
 typeSubst s i (TySum ctors) = TySum [(l, typeSubst s i t) | (l, t) <- ctors]
+typeSubst _ _ t@(TyProj _ _) = t -- no type vars to substitute in expression index
 
 tyEnvSubst :: Typ -> Int -> TyEnv -> TyEnv
 tyEnvSubst _ _ [] = []
 tyEnvSubst s i (Kind : rest) = Kind : tyEnvSubst (tshift 0 s) (i + 1) rest
 tyEnvSubst s i (TypeEq a : rest) =
   TypeEq (typeSubst s (i + keyLen rest) a) : tyEnvSubst (tshift 0 s) (i + 1) rest
+tyEnvSubst s i (TypeDef n a : rest) =
+  TypeDef n (typeSubst s (i + keyLen rest) a) : tyEnvSubst (tshift 0 s) (i + 1) rest
 tyEnvSubst s i (Type a : rest) =
   Type (typeSubst s (i + keyLen rest) a) : tyEnvSubst s i rest
 
@@ -57,12 +62,16 @@ tshiftBinds x (Type a : bs) =
   Type (tshift (keyLen bs + x) a) : tshiftBinds x bs
 tshiftBinds x (TypeEq a : bs) =
   TypeEq (tshift (keyLen bs + x) a) : tshiftBinds x bs
+tshiftBinds x (TypeDef n a : bs) =
+  TypeDef n (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
 inner :: TyEnv -> Int -> Maybe Int
 inner [] _ = Nothing
 inner (Type _ : g) x = inner g x
 inner (TypeEq _ : _g) 0 = Nothing
 inner (TypeEq _ : g) x = inner g (x - 1)
+inner (TypeDef _ _ : _g) 0 = Nothing
+inner (TypeDef _ _ : g) x = inner g (x - 1)
 inner (Kind : _g) 0 = pure 0
 inner (Kind : g) x = (+ 1) <$> inner g (x - 1)
 
@@ -71,6 +80,8 @@ lookt [] _ = Nothing
 lookt (Type _ : t) x = lookt t x
 lookt (TypeEq a : _t) 0 = pure (tshift 0 a)
 lookt (TypeEq _a : t) x = tshift 0 <$> lookt t (x - 1)
+lookt (TypeDef _ a : _t) 0 = pure (tshift 0 a)
+lookt (TypeDef _ _a : t) x = tshift 0 <$> lookt t (x - 1)
 lookt (Kind : _t) 0 = Nothing
 lookt (Kind : t) x = tshift 0 <$> lookt t (x - 1)
 
@@ -116,6 +127,16 @@ teq g1 (TySum c1) (TySum c2) g2 =
 teq g1 (TyList a) (TyList b) g2 =
   -- ADD THIS
   teq g1 a b g2
+teq g1 (TyProj a l1) (TyProj b l2) g2 =
+  l1 == l2 && a == b
+teq g1 (TyProj i l) b g2 =
+  case resolveTyProj g1 i l of
+    Just a -> teq g1 a b g2
+    Nothing -> False
+teq g1 a (TyProj i l) g2 =
+  case resolveTyProj g2 i l of
+    Just b -> teq g1 a b g2
+    Nothing -> False
 teq _ _ _ _ = False
 
 teqEnv :: TyEnv -> TyEnv -> TyEnv -> TyEnv -> Bool
@@ -125,6 +146,12 @@ teqEnv g1 (Kind : e1) (Kind : e2) g2 =
 teqEnv g1 (Type a : e1) (Type b : e2) g2 =
   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 teqEnv g1 (TypeEq a : e1) (TypeEq b : e2) g2 =
+  teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
+teqEnv g1 (TypeDef _ a : e1) (TypeDef _ b : e2) g2 =
+  teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
+teqEnv g1 (TypeDef _ a : e1) (TypeEq b : e2) g2 =
+  teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
+teqEnv g1 (TypeEq a : e1) (TypeDef _ b : e2) g2 =
   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 teqEnv _ _ _ _ = False
 
@@ -146,6 +173,8 @@ lvalue (ExpE v : e) = lvalue e && value v
 lvalue (RecE _ : e) = lvalue e
 lvalue (TypE (TyBoxT _ _) : e) = lvalue e
 lvalue (TypE _ : _) = False
+lvalue (TypEN _ (TyBoxT _ _) : e) = lvalue e
+lvalue (TypEN _ _ : _) = False
 
 lbIn :: String -> Typ -> Bool
 lbIn l (TyEnvt (Type (TyRcd l' _) : _)) = l == l'
@@ -157,6 +186,7 @@ wrapping :: TyEnv -> Typ -> Maybe Typ
 wrapping [] a = Just a
 wrapping (Type _ : g) a = wrapping g a
 wrapping (TypeEq c : g) a = wrapping g (TySubstT c a)
+wrapping (TypeDef _ c : g) a = wrapping g (TySubstT c a)
 wrapping (Kind : _) _ = Nothing
 
 rlk :: TyEnv -> String -> Maybe Typ
@@ -169,10 +199,12 @@ rlk (Type (TyEnvt t2) : g1) l
   | not (lbIn l (TyEnvt g1)) = wrapping g1 =<< rlk t2 l
   | otherwise = Nothing
 rlk (TypeEq _ : g1) l = rlk g1 l
+rlk (TypeDef _ _ : g1) l = rlk g1 l
 rlk _ _ = Nothing
 
 resolveProjEnv :: TyEnv -> Typ -> Maybe TyEnv
 resolveProjEnv _ (TyEnvt env) = Just env
+resolveProjEnv g (TyRcd _ t) = resolveProjEnv g t
 resolveProjEnv g (TyVar x) = lookt g x >>= resolveProjEnv g
 resolveProjEnv g (TySubstT s t) = do
   env <- resolveProjEnv g t
@@ -180,10 +212,28 @@ resolveProjEnv g (TySubstT s t) = do
 resolveProjEnv g (TyMu t) = resolveProjEnv g (TySubstT (TyMu t) t)
 resolveProjEnv _ _ = Nothing
 
+-- | Resolve a type projection from an expression variable
+resolveTyProj :: TyEnv -> Int -> String -> Maybe Typ
+resolveTyProj g i l = do
+  exprTyp <- getVar g i
+  env <- resolveProjEnv g exprTyp
+  tlk env l
+
+-- | Type label lookup: find a named type definition in a type environment
+tlk :: TyEnv -> String -> Maybe Typ
+tlk [] _ = Nothing
+tlk (TypeDef n a : g1) l
+  | l == n = wrapping g1 a
+  | otherwise = tlk g1 l
+tlk (TypeEq _ : g1) l = tlk g1 l
+tlk (Type _ : g1) l = tlk g1 l
+tlk (Kind : _) _ = Nothing
+
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
 getVar (TypeEq _ : g) x = tshift 0 <$> getVar g x
+getVar (TypeDef _ _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
@@ -194,6 +244,15 @@ resolveMuBody g (TySubstT s t) = do
   body <- resolveMuBody (TypeEq s : g) t
   pure (TySubstT s body)
 resolveMuBody _ _ = Nothing
+
+-- | Normalize a type by eagerly resolving TyProj references
+normTyp :: TyEnv -> Typ -> Typ
+normTyp g (TyProj i l) = maybe (TyProj i l) (normTyp g) (resolveTyProj g i l)
+normTyp g (TyArr a b) = TyArr (normTyp g a) (normTyp g b)
+normTyp g (TyRcd l a) = TyRcd l (normTyp g a)
+normTyp g (TyList a) = TyList (normTyp g a)
+normTyp g (TySum cs) = TySum [(l, normTyp g t) | (l, t) <- cs]
+normTyp _ t = t
 
 -- | Infer the type of an expression
 infer :: TyEnv -> Exp -> Maybe Typ
@@ -232,6 +291,9 @@ infer g (FEnv (RecE e : d)) = do
 infer g (FEnv (TypE t : d)) = do
   TyEnvt g1 <- infer g (FEnv d)
   return (TyEnvt (TypeEq t : g1))
+infer g (FEnv (TypEN name t : d)) = do
+  TyEnvt g1 <- infer g (FEnv d)
+  return (TyEnvt (TypeDef name t : g1))
 infer g (Rec l e) = TyRcd l <$> infer g e
 infer g (RProj e l) = do
   t <- infer g e
@@ -247,7 +309,8 @@ infer g (Unfold e) = do
   body <- resolveMuBody g t
   pure (typeSubst t 0 body)
 infer g (Anno e t) =
-  if check g e t then Just t else Nothing
+  let t' = normTyp g t
+  in if check g e t' then Just t' else Nothing
 infer g (BinOp (Add e1 e2)) = do
   guard (check g e1 (TyLit TyInt))
   guard (check g e2 (TyLit TyInt))

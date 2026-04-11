@@ -233,6 +233,7 @@ cmdCheck path = runPipeline path $ \ast -> do
     Nothing -> putStrLn "✗ Type check failed: Could not infer type"
     Just typ -> do
       putStrLn "✓ Type check succeeded!"
+      putStrLn $ "  Type: " ++ CoreFE.pretty typ
 
 cmdEval :: FilePath -> IO ()
 cmdEval path = runPipeline path $ \ast -> do

@@ -1,0 +1,12 @@
+module IntBox : sig type t = int; val make : int -> int; val get : int -> int; end =
+  struct
+    type t = int;
+    let make : int -> int = fun (x : int) -> x;
+    let get : int -> int = fun (x : int) -> x;
+  end;
+
+let x : IntBox.t = IntBox.make(42);
+let y : IntBox.t = IntBox.get(x);
+
+let apply : IntBox.t -> IntBox.t = fun (a : IntBox.t) -> IntBox.get(a);
+let result : int = apply(x);

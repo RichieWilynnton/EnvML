@@ -276,9 +276,9 @@ debruijnTests =
     )
   , ( "22. environment with TypE"
     , Named.FEnv [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
-    , Nameless.FEnv [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
-    , Just (Nameless.TyEnvt [Nameless.TypeEq (Nameless.TyLit Nameless.TyInt)])
-    , Just (Nameless.FEnv [Nameless.TypE (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))])
+    , Nameless.FEnv [Nameless.TypEN "t" (Nameless.TyLit Nameless.TyInt)]
+    , Just (Nameless.TyEnvt [Nameless.TypeDef "t" (Nameless.TyLit Nameless.TyInt)])
+    , Just (Nameless.FEnv [Nameless.TypEN "t" (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyInt))])
     )
 
     -- ==========================================================================
@@ -354,19 +354,19 @@ debruijnTests =
         ]
     , Nameless.FEnv 
         [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.TypE (Nameless.TyLit Nameless.TyBool)
+        , Nameless.TypEN "t" (Nameless.TyLit Nameless.TyBool)
         , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
         ]
     , Just (Nameless.TyEnvt 
         [ Nameless.Type (Nameless.TyLit Nameless.TyInt)
-        , Nameless.TypeEq (Nameless.TyLit Nameless.TyBool)
+        , Nameless.TypeDef "t" (Nameless.TyLit Nameless.TyBool)
         , Nameless.Type (Nameless.TyLit Nameless.TyInt)
         ])
     -- Eval result: TypE gets wrapped in TyBoxT with c2g of (rest ++ env)
     -- For the TypE at position 1, c2g of [ExpE (Lit 2)] ++ [] = []
     , Just (Nameless.FEnv 
         [ Nameless.ExpE (Nameless.Lit (Nameless.LitInt 1))
-        , Nameless.TypE (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyBool))
+        , Nameless.TypEN "t" (Nameless.TyBoxT [] (Nameless.TyLit Nameless.TyBool))
         , Nameless.ExpE (Nameless.Lit (Nameless.LitInt 2))
         ])
     )
@@ -442,11 +442,11 @@ debruijnTests =
         [Named.TypE "t" (Named.TyLit Nameless.TyInt)]
         (Named.Lam "x" (Named.Var "x"))
     , Nameless.TClos 
-        [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
+        [Nameless.TypEN "t" (Nameless.TyLit Nameless.TyInt)]
         (Nameless.Lam (Nameless.Var 0))
     , Nothing  -- closures need checking
     , Just (Nameless.TClos 
-        [Nameless.TypE (Nameless.TyLit Nameless.TyInt)]
+        [Nameless.TypEN "t" (Nameless.TyLit Nameless.TyInt)]
         (Nameless.Lam (Nameless.Var 0)))
     )
 

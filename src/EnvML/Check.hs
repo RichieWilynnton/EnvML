@@ -21,6 +21,7 @@ typeSubstName name s (TyMu n body)
   | n == name = TyMu n body
   | otherwise = TyMu n (typeSubstName name s body)
 typeSubstName name s (TyList t) = TyList (typeSubstName name s t)
+typeSubstName name s (TyProj t l) = TyProj (typeSubstName name s t) l
 typeSubstName name s (TyCtx ctx) = TyCtx (tyCtxSubstName name s ctx)
 typeSubstName name s (TyModule mty) = TyModule (substModTypName name s mty)
 
@@ -87,6 +88,16 @@ teq g1 (TyMu n1 a) (TyMu n2 b) g2 =
   teq (KindN n1 : g1) a (typeSubstName n2 (TyVar n1) b) (KindN n1 : g2)
 teq g1 (TyList a) (TyList b) g2 =
   teq g1 a b g2
+teq g1 (TyProj a l) b g2 =
+  case resolveTyProj g1 (TyProj a l) of
+    Just t  -> teq g1 t b g2
+    Nothing -> case b of
+      TyProj c l2 -> l == l2 && teq g1 a c g2
+      _ -> False
+teq g1 a (TyProj b l) g2 =
+  case resolveTyProj g2 (TyProj b l) of
+    Just t  -> teq g1 a t g2
+    Nothing -> False
 teq g1 (TyCtx ctx1) (TyCtx ctx2) g2 =
   teqCtx g1 ctx1 ctx2 g2
 teq g1 (TyModule m1) (TyModule m2) g2 =
@@ -106,6 +117,13 @@ teqCtx _ _ (Type _ : _) _ = error "Unnamed Type in TyCtx not supported."
 teqCtx _ (Kind : _) _ _ = error "Unnamed Kind in TyCtx not supported."
 teqCtx _ _ (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 teqCtx _ _ _ _ = False
+
+resolveTyProj :: TyCtx -> Typ -> Maybe Typ
+resolveTyProj g (TyProj (TyVar name) label) =
+  case getMod g name of
+    Just (TySig intf) -> lookupIntf label intf
+    _ -> Nothing
+resolveTyProj _ _ = Nothing
 
 getVar :: TyCtx -> Name -> Maybe Typ
 getVar [] _ = Nothing

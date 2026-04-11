@@ -8,6 +8,7 @@ data TyEnvE
   = Type Typ
   | Kind
   | TypeEq Typ
+  | TypeDef String Typ  -- Named type definition (like TypeEq but with label for projection)
   deriving (Eq, Show, Read)
 
 data Typ
@@ -22,6 +23,7 @@ data Typ
   | TySum [(String, Typ)]
   | TyEnvt TyEnv
   | TyList Typ -- [A]
+  | TyProj Int String -- type-level projection: x_i.l (from expression var at index i)
   deriving (Eq, Show, Read)
 
 data TyLit
@@ -33,7 +35,7 @@ data TyLit
 
 type Env = [EnvE]
 
-data EnvE = ExpE Exp | RecE Exp | TypE Typ -- RecE is internal (used for fixpoints to avoid infinite envs when printing)
+data EnvE = ExpE Exp | RecE Exp | TypE Typ | TypEN String Typ -- RecE is internal (used for fixpoints to avoid infinite envs when printing)
   deriving (Eq, Show, Read)
 
 data Exp
@@ -166,6 +168,7 @@ stringOfTyp (TySum ctors) =
     stringOfCons f [x] = f x
     stringOfCons f (x : xs) = f x ++ " + " ++ stringOfCons f xs
 stringOfTyp (TyList t) = "[" ++ stringOfTyp t ++ "]"
+stringOfTyp (TyProj i l) = "x" ++ show i ++ "." ++ l
 
 typPrec :: Typ -> Int
 typPrec (TyLit _) = 10
@@ -174,6 +177,7 @@ typPrec (TyRcd _ _) = 10
 typPrec (TySum _) = 10
 typPrec (TyEnvt _) = 10
 typPrec (TyList _) = 10
+typPrec (TyProj _ _) = 10
 typPrec (TySubstT _ _) = 8
 typPrec (TyBoxT _ _) = 8
 typPrec (TyArr _ _) = 4
@@ -184,6 +188,7 @@ stringOfTyEnvE :: TyEnvE -> String
 stringOfTyEnvE (Type t) = stringOfTyp t
 stringOfTyEnvE Kind = "★"
 stringOfTyEnvE (TypeEq t) = "≡ " ++ stringOfTyp t
+stringOfTyEnvE (TypeDef n t) = "≡ " ++ n ++ " = " ++ stringOfTyp t
 
 showTyEnv :: TyEnv -> String
 showTyEnv = stringOfList stringOfTyEnvE . reverse
@@ -195,6 +200,7 @@ stringOfEnvEI :: Int -> EnvE -> String
 stringOfEnvEI lvl (ExpE e) = stringOfEnvExpI lvl e
 stringOfEnvEI _ (RecE _) = "<rec>"
 stringOfEnvEI _ (TypE t) = "type " ++ stringOfTyp t
+stringOfEnvEI _ (TypEN n t) = "type " ++ n ++ " = " ++ stringOfTyp t
 
 stringOfEnvExpI :: Int -> Exp -> String
 stringOfEnvExpI lvl (Rec label e) =
@@ -294,6 +300,7 @@ isSimpleEnvE :: EnvE -> Bool
 isSimpleEnvE (ExpE e) = isSimpleExp e
 isSimpleEnvE (RecE _) = False
 isSimpleEnvE (TypE _) = True
+isSimpleEnvE (TypEN _ _) = True
 
 isSimpleExp :: Exp -> Bool
 isSimpleExp (Lit _) = True

@@ -179,7 +179,9 @@ toNamelessEnvE eNames tNames entry =
   case entry of
     Named.ExpE _n e -> Nameless.ExpE $ toNamelessExp eNames tNames e
     Named.ModE n e  -> Nameless.ExpE (Nameless.Rec n (toNamelessExp eNames tNames e))
-    Named.TypE _n t -> Nameless.TypE $ toNamelessTyp eNames tNames t
+    Named.TypE n t -> 
+      let t' = toNamelessTyp eNames tNames t
+      in if n == "_" then Nameless.TypE t' else Nameless.TypEN n t'
 
 getEntryName :: Named.EnvE -> Name
 getEntryName (Named.ExpE n _e) = n
@@ -225,6 +227,11 @@ toNamelessTyp eNames tNames ty =
       Nameless.TyEnvt (toNamelessTyEnv eNames tNames env)
     Named.TyList a      ->
       Nameless.TyList (toNamelessTyp eNames tNames a)
+    Named.TyProj (Named.TyVar n) l ->
+      let (i, _) = indexE n eNames
+      in Nameless.TyProj i l
+    Named.TyProj _ l ->
+      error ("TyProj: unsupported projection base for ." ++ l)
 
 getTyEntryNames ::
   Named.TyEnv
@@ -264,7 +271,9 @@ toNamelessTyEnvE eNames tNames entry =
   case entry of
     Named.Type _n ty   -> Nameless.Type   (toNamelessTyp eNames tNames ty)
     Named.Kind _n      -> Nameless.Kind
-    Named.TypeEq _n ty -> Nameless.TypeEq (toNamelessTyp eNames tNames ty)
+    Named.TypeEq n ty -> 
+      let ty' = toNamelessTyp eNames tNames ty
+      in if n == "_" then Nameless.TypeEq ty' else Nameless.TypeDef n ty'
 
 toDeBruijn :: Named.Exp -> Nameless.Exp
 toDeBruijn = toNamelessExp [] []

@@ -11,9 +11,14 @@ lookupv (RecE v : _) 0 = pure v
 lookupv (ExpE _ : xs) n = lookupv xs (n - 1)
 lookupv (RecE _ : xs) n = lookupv xs (n - 1)
 lookupv (TypE _ : xs) n = lookupv xs n
+lookupv (TypEN _ _ : xs) n = lookupv xs n
 
 c2g :: Env -> TyEnv
-c2g env = [TypeEq a | TypE a <- env]
+c2g env = concatMap f env
+  where
+    f (TypE a) = [TypeEq a]
+    f (TypEN name a) = [TypeDef name a]
+    f _ = []
 
 wrapEnvInTyBox :: TyEnv -> Typ -> Typ
 wrapEnvInTyBox _ t@(TyBoxT _ _) = t
@@ -73,6 +78,10 @@ eval env = go
       FEnv ve1 <- eval env (FEnv e1)
       let b = TyBoxT (c2g (ve1 ++ env)) a
       return $ FEnv (TypE b : ve1)
+    go (FEnv (TypEN name a : e1)) = do
+      FEnv ve1 <- eval env (FEnv e1)
+      let b = TyBoxT (c2g (ve1 ++ env)) a
+      return $ FEnv (TypEN name b : ve1)
     go (Rec l e) = Rec l <$> eval env e
     go (RProj e l) = do
       v <- eval env e

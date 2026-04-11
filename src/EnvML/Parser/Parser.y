@@ -198,7 +198,7 @@ Atom :: { Exp }
   | '(' ')'                   { Lit CoreFE.LitUnit }
   | id                        { Var $1 }
   | '{' RecFields '}'         { Rec $2 }
-  | '[' Env ']'               { FEnv $2 }
+--  | '[' Env ']'               { FEnv $2 } -- Don't support first-class environments for now, as they can be easily encoded with modules
   | List '[' ListElems ']'    { EList $3 }
   | nil                       { EList [] }
   | take '(' num ',' Exp ')'  { ETake $3 $5 }
@@ -261,6 +261,7 @@ BaseTyp :: { Typ }
   | '{' TyRcdFields '}'    { TyRcd $2 }
   | '[' TyCtx ']'          { TyCtx $2 }
   | list BaseTyp           { TyList $2 }
+  | BaseTyp '.' id         { TyProj $1 $3 }
   | '(' Typ ')'            { $2 }
   | sig Intf end           { TyModule (TySig $2) }
 

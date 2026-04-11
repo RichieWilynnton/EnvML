@@ -75,6 +75,7 @@ data Typ
   | TySum    [(String, Typ)]
   | TyEnvt   TyEnv          -- Γ
   | TyList   Typ            -- [A]
+  | TyProj   Typ String     -- A.l (type projection)
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -119,6 +120,7 @@ prettyTyp (TySum ctors) =
   in intercalate " | " (map showCtor ctors)
 prettyTyp (TyEnvt env) = "Env[" ++ prettyTyEnv env ++ "]"
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
+prettyTyp (TyProj t l) = prettyTyp t ++ "." ++ l
 
 prettyTyLit :: Nameless.TyLit -> String
 prettyTyLit Nameless.TyInt  = "int"

@@ -166,3 +166,4 @@ desugarTypWithBinder mb ty = case ty of
   Src.TyCtx ctx    -> Src.TyCtx (reverse ctx)
   Src.TyModule mt  -> Src.TyModule (desugarModuleTyp mt)
   Src.TyList t     -> Src.TyList (desugarTypWithBinder mb t)
+  Src.TyProj t l   -> Src.TyProj (desugarTypWithBinder mb t) l
