@@ -860,32 +860,41 @@ let result : int = fact(placeholder)(4);`
         id: "e13", label: "Sum types and case statements",
         code: `type Shape = Square as int | Rect as {w : int, h : int};
 
+type Shape = Square as {w : int} 
+            | Rect as {w : int, h : int}
+            | Line as {l : int};
+
 let a = Square(2) as Shape;
 let b = Rect({w = 3, h = 4}) as Shape;
+let c = Line({l = 2}) as Shape;
 
 let area : Shape -> int =
   fun (s : Shape) ->
     case s of 
-    | <Square=r> => r * r 
-    | <Rect=dim> => dim.w * dim.h;
+    | <Square=sq> => sq.w * sq.w
+    | <Rect=dim> => dim.w * dim.h
+    | _ => 0;
 
 let resultA : int = area(a);
-let resultB : int = area(b);`
+let resultB : int = area(b);
+let resultC : int = area(c);
+`
       },
       {
         id: "e14", label: "Recursive NatList",
-        code: `type NatList = Nil as int | Cons as NatList;
+        code: `
+type NatList = Nil as unit | Cons as {num : int, next : NatList};
 
-let a = Nil(2) as NatList;
-let b = Cons(Nil(2) as NatList) as NatList;
-let c = Cons(b) as NatList;
-let getNum : NatList -> int = fix f. fun (l : NatList) -> (
+let a = Cons({num = 5, next = Nil(()) as NatList}) as NatList;
+let b = Cons({num = 10, next = b}) as NatList;
+let sum : NatList -> int = fix f. fun (l : NatList) -> (
     case l of
-    | <Nil = x> => x
-    | <Cons = x> => f(x)
+    | <Nil = x> => 0
+    | <Cons = x> => x.num + f(x.next)
 );
 
-let res = getNum(c);`
+let res = sum(c);
+`
       },
       {
         id: "e15", label: "STLC implementation",

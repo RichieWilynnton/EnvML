@@ -1,12 +1,11 @@
-type NatList = Nil as int | Cons as NatList;
+type NatList = Nil as unit | Cons as {num : int, next : NatList};
 
-let a = Nil(2) as NatList;
-let b = Cons(Nil(2) as NatList) as NatList;
-let c = Cons(b) as NatList;
-let getNum : NatList -> int = fix f. fun (l : NatList) -> (
+let a = Cons({num = 5, next = Nil(()) as NatList}) as NatList;
+let b = Cons({num = 10, next = b}) as NatList;
+let sum : NatList -> int = fix f. fun (l : NatList) -> (
     case l of
-    | <Nil = x> => x
-    | <Cons = x> => f(x)
+    | <Nil = x> => 0
+    | <Cons = x> => x.num + f(x.next)
 );
 
-let res = getNum(c);
+let res = sum(c);

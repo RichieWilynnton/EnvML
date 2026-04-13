@@ -1,13 +1,18 @@
-type Shape = Square as int | Rect as {w : int, h : int};
+type Shape = Square as {w : int} 
+            | Rect as {w : int, h : int}
+            | Line as {l : int};
 
 let a = Square(2) as Shape;
 let b = Rect({w = 3, h = 4}) as Shape;
+let c = Line({l = 2}) as Shape;
 
 let area : Shape -> int =
   fun (s : Shape) ->
     case s of 
-    | <Square=r> => r * r 
-    | <Rect=dim> => dim.w * dim.h;
+    | <Square=sq> => sq.w * sq.w
+    | <Rect=dim> => dim.w * dim.h
+    | _ => 0;
 
 let resultA : int = area(a);
 let resultB : int = area(b);
+let resultC : int = area(c);
