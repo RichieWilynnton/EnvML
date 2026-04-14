@@ -12,6 +12,7 @@ library
                         Repl
                         PrettyWeb
                         EnvML.Elab
+                        EnvML.Build
                         EnvML.Check
                         EnvML.Desugar
                         EnvML.Desugared

@@ -27,6 +27,7 @@ import qualified CoreFE.Check as Check
 import qualified CoreFE.Eval as Eval
 import qualified CoreFE.DeBruijn as DeBruijn
 import qualified EnvML.Check as SCheck
+import qualified EnvML.Build as Build
 import Debug.Trace
 
 banner :: String
@@ -81,6 +82,7 @@ processCommand cmd
   | Just path <- stripPrefix ":sep-obj " cmd   = cmdSepObj (trim path)
   | Just args <- stripPrefix ":sep-link " cmd  = cmdSepLink (trim args)
   | Just path <- stripPrefix ":sep-info " cmd  = cmdSepInfo (trim path)
+  | Just path <- stripPrefix ":build " cmd    = cmdBuild (trim path)
   | Just path <- stripPrefix ":l " cmd        = cmdLoad (trim path)
   | Just dir  <- stripPrefix ":clean " cmd    = cmdClean (trim dir)
   | Just path <- stripPrefix ":c " cmd     = cmdCheck (trim path)
@@ -116,6 +118,10 @@ printHelp = putStrLn $ unlines
   , "│  :sep-link <f.emlo> [deps.emle] → App-fold + type check → .emle │"
   , "│  :sep-eval <f.emle>        → Evaluate linked file               │"
   , "│  :sep-info <f.emlo>        → Display .emlo contents             │"
+  , "├─────────────────────────────────────────────────────────────────┤"
+  , "│  Build system                                                  │"
+  , "├─────────────────────────────────────────────────────────────────┤"
+  , "│  :build <file> Auto-build from entry .eml (topo-sort + link)   │"
   , "├─────────────────────────────────────────────────────────────────┤"
   , "│  Utilities                                                     │"
   , "├─────────────────────────────────────────────────────────────────┤"
@@ -427,3 +433,6 @@ cmdSepCheck path = do
   where
     handler :: SomeException -> IO (Either String Desugared.Module)
     handler e = return $ Left $ show e
+
+cmdBuild :: FilePath -> IO ()
+cmdBuild = Build.build cmdSepObj cmdSepLink
