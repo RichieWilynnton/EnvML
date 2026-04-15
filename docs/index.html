@@ -886,14 +886,14 @@ let resultC : int = area(c);
 type NatList = Nil as unit | Cons as {num : int, next : NatList};
 
 let a = Cons({num = 5, next = Nil(()) as NatList}) as NatList;
-let b = Cons({num = 10, next = b}) as NatList;
+let b = Cons({num = 10, next = a}) as NatList;
 let sum : NatList -> int = fix f. fun (l : NatList) -> (
     case l of
     | <Nil = x> => 0
     | <Cons = x> => x.num + f(x.next)
 );
 
-let res = sum(c);
+let res = sum(b);
 `
       },
       {
