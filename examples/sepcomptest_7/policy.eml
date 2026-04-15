@@ -1,0 +1,5 @@
+let identity : forall a. a -> a =
+  fun (type t) (x : t) -> x;
+
+let negate : int -> int =
+  fun (x : int) -> 0 - x;

@@ -139,6 +139,7 @@ elabTyp ty = case ty of
     EnvML.TyModule mty -> elabModTyp mty
     EnvML.TyList ty1 -> CoreFE.TyList (elabTyp ty1)
     EnvML.TyProj ty1 l -> CoreFE.TyProj (elabTyp ty1) l
+    EnvML.TyApp f a -> CoreFE.TyApp (elabTyp f) (elabTyp a)
 
 -- TyCtx is already reversed by desugaring
 elabTyCtx :: EnvML.TyCtx -> CoreFE.TyEnv
@@ -192,7 +193,7 @@ elabIntfE ie =
     EnvML.ValDecl name ty ->
       CoreFE.Type name (CoreFE.TyRcd name (elabTyp ty))
     EnvML.ModDecl name ty ->
-      CoreFE.Type name (elabTyp ty)
+      CoreFE.Type name (CoreFE.TyRcd name (elabTyp ty))
     EnvML.FunctorDecl name _args ty ->
       CoreFE.Type name (elabTyp ty)
     EnvML.SigDecl name intf ->

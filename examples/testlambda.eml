@@ -4,28 +4,24 @@ type ty =
 | TArrow as {arg : ty, ret : ty};
 
 type exp =
-  Var as string
+  Var as {str : string}
 | Lam as {name : string, argT : ty, body : exp}
 | App as {funcE : exp, argE : exp}
-| Nat as int;
+| Nat as {n : int};
 
-type maybeExp =
-    Just as exp
+type maybe = forall t.
+    Just as t
 | Error as string;
 
-type maybeTy =
-    TyOk as ty
-| TyError as string;
-
 type tyCtx =
-    CtxNil as int
+    CtxNil as unit
 | CtxCons as {name : string, entryT : ty, rest : tyCtx};
 
 let subst : string -> exp -> exp -> exp =
     fix go. fun (name : string) (value : exp) (e : exp) -> (
         case e of
         | <Var = v> =>
-            if (v == name) then
+            if (v.str == name) then
                 value
             else
                 Var(v) as exp
@@ -43,32 +39,32 @@ let subst : string -> exp -> exp -> exp =
         | <Nat = n> => Nat(n) as exp
     );
 
-let eval : exp -> maybeExp =
+let eval : exp -> maybe<exp> =
     fix go. fun (e : exp) -> (
         case e of
-        | <Var = v> => Error("Runtime error: unbound variable") as maybeExp
-        | <Lam = l> => Just(e) as maybeExp
-        | <Nat = n> => Just(e) as maybeExp
+        | <Var = v> => Error("Runtime error: unbound variable") as maybe<exp>
+        | <Lam = l> => Just(e) as maybe<exp>
+        | <Nat = n> => Just(e) as maybe<exp>
         | <App = a> => 
             case go(a.funcE) of
-            | <Error = errF> => Error(errF) as maybeExp
+            | <Error = errF> => Error(errF) as maybe<exp>
             | <Just = funcVal> =>
                 case go(a.argE) of
-                | <Error = errA> => Error(errA) as maybeExp
+                | <Error = errA> => Error(errA) as maybe<exp>
                 | <Just = argVal> => 
                     case funcVal of
                     | <Lam = f> => go(subst (f.name) (argVal) (f.body))
-                    | _ => Error("Runtime error: head of application is not a lambda") as maybeExp
+                    | _ => Error("Runtime error: head of application is not a lambda") as maybe<exp>
                      
     );
 
-let lookupTy : string -> tyCtx -> maybeTy =
+let lookupTy : string -> tyCtx -> maybe<ty> =
     fix go. fun (name : string) (ctx : tyCtx) -> (
         case ctx of
-        | <CtxNil = n> => TyError("Type error: variable not found in context") as maybeTy
+        | <CtxNil = n> => Error("Type error: variable not found in context") as maybe<ty>
         | <CtxCons = c> =>
             if (c.name == name) then
-                TyOk(c.entryT) as maybeTy
+                Just(c.entryT) as maybe<ty>
             else
                 go(name)(c.rest)
     );
@@ -77,40 +73,40 @@ let extendCtx : string -> ty -> tyCtx -> tyCtx =
     fun (name : string) (entryT : ty) (rest : tyCtx) ->
         CtxCons({name = name, entryT = entryT, rest = rest}) as tyCtx;
 
-let typeCheck : tyCtx -> exp -> maybeTy =
+let typeCheck : tyCtx -> exp -> maybe<ty> =
     fix go. fun (ctx : tyCtx) (e : exp) -> (
         case e of
-        | <Var = v> => lookupTy(v)(ctx)
-        | <Nat = n> => TyOk(TNat(()) as ty) as maybeTy
+        | <Var = v> => lookupTy(v.str)(ctx)
+        | <Nat = n> => Just(TNat(()) as ty) as maybe<ty>
         | <Lam = l> => (
             case go(extendCtx(l.name)(l.argT)(ctx))(l.body) of
-            | <TyOk = bodyT> =>
-                TyOk(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybeTy
-            | <TyError = err> => TyError(err) as maybeTy
+            | <Just = bodyT> =>
+                Just(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybe<ty>
+            | <Error = err> => Error(err) as maybe<ty>
         )
         | <App = a> =>
             case go(ctx)(a.funcE) of
-            | <TyError = errF> => TyError(errF) as maybeTy
-            | <TyOk = funcT> =>
+            | <Error = errF> => Error(errF) as maybe<ty>
+            | <Just = funcT> =>
                 case go(ctx)(a.argE) of
-                | <TyError = errA> => TyError(errA) as maybeTy
-                | <TyOk = argT> =>
+                | <Error = errA> => Error(errA) as maybe<ty>
+                | <Just = argT> =>
                     case funcT of
                     | <TArrow = arr> =>
                         if arr.arg == argT then
-                            TyOk(arr.ret) as maybeTy
+                            Just(arr.ret) as maybe<ty>
                         else
-                            TyError("Type error: argument type mismatch") as maybeTy
-                    | _ => TyError("Type error: attempted to apply a non-function") as maybeTy
+                            Error("Type error: argument type mismatch") as maybe<ty>
+                    | _ => Error("Type error: attempted to apply a non-function") as maybe<ty>
     );
 
 -- ========== subst test ==========
 
 let substExample = box [
-  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+  body = App({funcE = Var({str = "x"}) as exp, argE = Var({str = "y"}) as exp}) as exp,
   lam = Lam({name = "y", argT = TNat(()) as ty, body = body}) as exp, 
-  target = App({funcE = lam, argE = Var("y") as exp}) as exp, 
-  value = Nat(42) as exp,
+  target = App({funcE = lam, argE = Var({str = "y"}) as exp}) as exp, 
+  value = Nat({n = 42}) as exp,
   subst = subst
 ] in
 -- ***** human readable version *****
@@ -120,14 +116,14 @@ subst ("y") (value) (target);
 
 
 ------ ========== eval and check test ==========
-let emptyTyCtx = CtxNil(0) as tyCtx;
+let emptyTyCtx = CtxNil(()) as tyCtx;
 
 let checkExample = box [
-  body = App({funcE = Var("x") as exp, argE = Var("y") as exp}) as exp,
+  body = App({funcE = Var({str = "x"}) as exp, argE = Var({str = "y"}) as exp}) as exp,
   funY = Lam({name = "y", argT = TNat(()) as ty, body = body}) as exp, 
   funX = Lam({name = "x", argT = TArrow ({arg = TNat(()) as ty, ret = TNat(()) as ty}) as ty, body = funY}) as exp,
-  id = Lam({name = "x", argT = TNat(()) as ty, body = Var("x") as exp}) as exp, 
-  two = Nat(2) as exp,
+  id = Lam({name = "x", argT = TNat(()) as ty, body = Var({str = "x"}) as exp}) as exp, 
+  two = Nat({n = 2}) as exp,
   
   app1 = App ({funcE = funX, argE = id}) as exp,
   app2 = App ({funcE = app1, argE = two}) as exp,
@@ -138,7 +134,11 @@ let checkExample = box [
 ] in 
 -- ***** human readable version ******
 -- app2 == (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
-[
-    typeCheckRes = typeCheck (emptyTyCtx) (app2),
-    evalRes = eval (app2)
-];
+struct
+
+    let typeCheckRes = typeCheck (emptyTyCtx) (app2);
+    let evalRes = eval (app2);
+end
+;
+
+

@@ -54,6 +54,7 @@ data Typ
   | TyModule  ModuleTyp       -- Note: First-class modules
   | TyList    Typ             -- [A]
   | TyProj    Typ Name        -- A.l (type projection)
+  | TyApp     Typ Typ          -- type-level application: (forall a. A) B
   deriving (Show, Eq)
 
 data Module
@@ -145,6 +146,7 @@ typPrec t = case t of
   TyArr _ _   -> 2
   TyBoxT _ _  -> 1
   TyAll _ _   -> 1
+  TyApp _ _   -> 3
 
 expPrec :: Exp -> Precedence
 expPrec e = case e of
@@ -312,6 +314,7 @@ prettyTyp (TyMu n t) = "mu " ++ n ++ ". " ++ prettyTyp t
 prettyTyp (TyModule mt) = prettyModuleTyp mt
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 prettyTyp (TyProj t l) = prettyTyp t ++ "." ++ l
+prettyTyp (TyApp f a) = prettyTyp f ++ "<" ++ prettyTyp a ++ ">"
 
 prettyCtorSpec :: (Name, Typ) -> String
 prettyCtorSpec (ctor, ty) = ctor ++ " as " ++ prettyTyp ty

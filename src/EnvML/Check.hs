@@ -22,6 +22,7 @@ typeSubstName name s (TyMu n body)
   | otherwise = TyMu n (typeSubstName name s body)
 typeSubstName name s (TyList t) = TyList (typeSubstName name s t)
 typeSubstName name s (TyProj t l) = TyProj (typeSubstName name s t) l
+typeSubstName name s (TyApp f a) = TyApp (typeSubstName name s f) (typeSubstName name s a)
 typeSubstName name s (TyCtx ctx) = TyCtx (tyCtxSubstName name s ctx)
 typeSubstName name s (TyModule mty) = TyModule (substModTypName name s mty)
 
@@ -98,11 +99,28 @@ teq g1 a (TyProj b l) g2 =
   case resolveTyProj g2 (TyProj b l) of
     Just t  -> teq g1 a t g2
     Nothing -> False
+teq g1 (TyApp f a) b g2 =
+  case reduceTyApp g1 f a of
+    Just t  -> teq g1 t b g2
+    Nothing -> case b of
+      TyApp f' a' -> teq g1 f f' g2 && teq g1 a a' g2
+      _           -> False
+teq g1 a (TyApp f b) g2 =
+  case reduceTyApp g2 f b of
+    Just t  -> teq g1 a t g2
+    Nothing -> False
 teq g1 (TyCtx ctx1) (TyCtx ctx2) g2 =
   teqCtx g1 ctx1 ctx2 g2
 teq g1 (TyModule m1) (TyModule m2) g2 =
   mtyEq g1 m1 m2 g2
 teq _ _ _ _ = False
+
+-- | Reduce a type-level application: (forall a. B) A -> [A/a]B
+reduceTyApp :: TyCtx -> Typ -> Typ -> Maybe Typ
+reduceTyApp _ (TyAll n body) arg = Just (typeSubstName n arg body)
+reduceTyApp g (TyVar x) arg =
+  lookupTypeEq g x >>= \f -> reduceTyApp g f arg
+reduceTyApp _ _ _ = Nothing
 
 teqCtx :: TyCtx -> TyCtx -> TyCtx -> TyCtx -> Bool
 teqCtx _ [] [] _ = True
@@ -394,16 +412,24 @@ resolveTySum :: TyCtx -> Typ -> Maybe [(Name, Typ)]
 resolveTySum _ (TySum ctors) = Just ctors
 resolveTySum g (TyVar x) =
   lookupTypeEq g x >>= resolveTySum g
+resolveTySum g (TyApp f a) =
+  reduceTyApp g f a >>= resolveTySum g
+resolveTySum g (TyMu n body) =
+  resolveTySum g (typeSubstName n (TyMu n body) body)
 resolveTySum _ _ = Nothing
 
 unfoldMu :: TyCtx -> Typ -> Maybe Typ
 unfoldMu _ (TyMu n body) = Just (typeSubstName n (TyMu n body) body)
 unfoldMu g (TyVar x) = lookupTypeEq g x >>= unfoldMu g
+unfoldMu g (TyApp f a) =
+  reduceTyApp g f a >>= unfoldMu g
 unfoldMu _ _ = Nothing
 
 resolveToMu :: TyCtx -> Typ -> Maybe (Name, Typ)
 resolveToMu _ (TyMu n body) = Just (n, body)
 resolveToMu g (TyVar x) = lookupTypeEq g x >>= resolveToMu g
+resolveToMu g (TyApp f a) =
+  reduceTyApp g f a >>= resolveToMu g
 resolveToMu _ _ = Nothing
 
 inferCaseBranches :: TyCtx -> [(Name, Typ)] -> [D.CaseBranch] -> Maybe Typ

@@ -1,0 +1,3 @@
+module apply : (forallm t. sig val trans : t -> t; end) ->m (sig type a = int; val f : a -> a; end);
+module wrap_identity : forallm t. sig val trans : t -> t; end;
+val result : int;

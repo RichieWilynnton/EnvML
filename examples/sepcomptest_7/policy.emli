@@ -1,0 +1,2 @@
+val identity : forall a. a -> a;
+val negate   : int -> int;

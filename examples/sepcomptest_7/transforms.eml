@@ -1,0 +1,16 @@
+module apply :
+  (forallm t. sig val trans : t -> t; end)
+  ->m (sig type a = int; val f : a -> a; end)
+  = functor (p) ->
+      struct
+        type a = int;
+        let f : a -> a = ((p @m a)::(sig val trans : int -> int; end)).trans;
+      end;
+
+module wrap_identity : forallm t. sig val trans : t -> t; end
+  = functor (type t) ->
+      struct
+        let trans : t -> t = fun (x) -> x;
+      end;
+
+let result : int = apply(|wrap_identity|).f(42);

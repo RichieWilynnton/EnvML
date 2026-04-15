@@ -26,7 +26,9 @@ tshift x (TyList a) = TyList (tshift x a) -- ADD THIS
 tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
 tshift x (TyMu t) = TyMu (tshift (1 + x) t)
 tshift _ t@(TyProj _ _) = t -- expression indices don't shift with type shifts
+tshift x (TyApp a b) = TyApp (tshift x a) (tshift x b)
 
+-- | TODO: Immediate substitution should be avoided
 -- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
 typeSubst :: Typ -> Int -> Typ -> Typ
 typeSubst _ _ (TyLit l) = TyLit l
@@ -44,6 +46,7 @@ typeSubst s i (TyEnvt bs) = TyEnvt (tyEnvSubst s i bs)
 typeSubst s i (TyList a) = TyList (typeSubst s i a)
 typeSubst s i (TySum ctors) = TySum [(l, typeSubst s i t) | (l, t) <- ctors]
 typeSubst _ _ t@(TyProj _ _) = t -- no type vars to substitute in expression index
+typeSubst s i (TyApp a b) = TyApp (typeSubst s i a) (typeSubst s i b)
 
 tyEnvSubst :: Typ -> Int -> TyEnv -> TyEnv
 tyEnvSubst _ _ [] = []
@@ -136,6 +139,16 @@ teq g1 (TyProj i l) b g2 =
 teq g1 a (TyProj i l) g2 =
   case resolveTyProj g2 i l of
     Just b -> teq g1 a b g2
+    Nothing -> False
+teq g1 (TyApp f a) b g2 =
+  case reduceTyApp g1 f a of
+    Just t  -> teq g1 t b g2
+    Nothing -> case b of
+      TyApp f' a' -> teq g1 f f' g2 && teq g1 a a' g2
+      _           -> False
+teq g1 a (TyApp f b) g2 =
+  case reduceTyApp g2 f b of
+    Just t  -> teq g1 a t g2
     Nothing -> False
 teq _ _ _ _ = False
 
@@ -242,7 +255,11 @@ resolveMuBody _ (TyMu body) = Just body
 resolveMuBody g (TyVar x) = lookt g x >>= resolveMuBody g
 resolveMuBody g (TySubstT s t) = do
   body <- resolveMuBody (TypeEq s : g) t
-  pure (TySubstT s body)
+  -- body has var 0 = mu recursion, var 1 = the TySubstT binding
+  -- Substitute s (shifted for the mu binder) at index 1, preserving var 0 for mu unfolding
+  pure (typeSubst (tshift 0 s) 1 body)
+resolveMuBody g (TyApp f a) =
+  reduceTyApp g f a >>= resolveMuBody g
 resolveMuBody _ _ = Nothing
 
 -- | Normalize a type by eagerly resolving TyProj references
@@ -252,7 +269,20 @@ normTyp g (TyArr a b) = TyArr (normTyp g a) (normTyp g b)
 normTyp g (TyRcd l a) = TyRcd l (normTyp g a)
 normTyp g (TyList a) = TyList (normTyp g a)
 normTyp g (TySum cs) = TySum [(l, normTyp g t) | (l, t) <- cs]
+normTyp g (TyApp f a) =
+  case reduceTyApp g f a of
+    Just t  -> normTyp g t
+    Nothing -> TyApp (normTyp g f) (normTyp g a)
 normTyp _ t = t
+
+-- | Reduce a type-level application: (∀. B) A → [A/0]B
+reduceTyApp :: TyEnv -> Typ -> Typ -> Maybe Typ
+reduceTyApp _ (TyAll body) arg = Just (TySubstT arg body)
+reduceTyApp g (TyVar x) arg =
+  lookt g x >>= \f -> reduceTyApp g f arg
+reduceTyApp g (TySubstT s t) arg = do
+  reduceTyApp (TypeEq s : g) t arg
+reduceTyApp _ _ _ = Nothing
 
 -- | Infer the type of an expression
 infer :: TyEnv -> Exp -> Maybe Typ
@@ -300,10 +330,11 @@ infer g (RProj e l) = do
   g1 <- resolveProjEnv g t
   rlk g1 l
 infer g (Fold t e) = do
-  body <- resolveMuBody g t
-  let unfoldedBody = typeSubst t 0 body
+  let t' = normTyp g t
+  body <- resolveMuBody g t'
+  let unfoldedBody = typeSubst t' 0 body
   guard (check g e unfoldedBody)
-  pure t
+  pure t'
 infer g (Unfold e) = do
   t <- infer g e
   body <- resolveMuBody g t
@@ -373,6 +404,12 @@ infer _ _ = Nothing
 -- | Check an expression against a type
 check :: TyEnv -> Exp -> Typ -> Bool
 check g e (TySubstT a b) = check (TypeEq a : g) e b
+check g e (TyApp f a) =
+  case reduceTyApp g f a of
+    Just t  -> check g e t
+    Nothing -> case infer g e of
+      Just t' -> teq g t' (TyApp f a) g
+      _       -> False
 check g (Lam e) (TyArr a b) = check (Type a : g) e b
 check g (TLam e) (TyAll a) =
   check (Kind : g) e a
@@ -386,6 +423,12 @@ check g (TClos d e) (TyBoxT g1 (TyAll a)) =
     _ -> False
 check g (Fix e) (TyArr a b) =
   check (Type (TyArr a b) : g) e (TyArr a b)
+check g (Fold _ e) ty =
+  case resolveMuBody g ty of
+    Just body ->
+      let unfoldedBody = typeSubst ty 0 body
+      in check g e unfoldedBody
+    Nothing -> False
 check g (DataCon ctor args) ty =
   case resolveTySum g ty of
     Just ctors ->
@@ -443,4 +486,6 @@ resolveTySum g (TySubstT a b) = do
   ctors <- resolveTySum g b
   pure [(name, TySubstT a payloadTy) | (name, payloadTy) <- ctors]
 resolveTySum g (TyMu a) = resolveTySum g (TySubstT (TyMu a) a)
+resolveTySum g (TyApp f a) =
+  reduceTyApp g f a >>= resolveTySum g
 resolveTySum _ _ = Nothing

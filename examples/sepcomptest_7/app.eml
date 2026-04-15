@@ -1,0 +1,6 @@
+import policy;
+import transforms;
+
+let r1 : int = transforms.result;
+let r2 : int = (policy.identity @int)(10);
+let r3 : int = policy.negate(5);

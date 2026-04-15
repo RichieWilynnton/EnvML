@@ -282,6 +282,7 @@ prettyDeBruijnTyp (CoreFE.TySum ctors) =
 prettyDeBruijnTyp (CoreFE.TyEnvt env) = "Env[" ++ prettyDeBruijnTyEnv env ++ "]"
 prettyDeBruijnTyp (CoreFE.TyList es) = "list " ++ prettyDeBruijnTyp es
 prettyDeBruijnTyp (CoreFE.TyProj i l) = "x" ++ show i ++ "." ++ l
+prettyDeBruijnTyp (CoreFE.TyApp f a) = prettyDeBruijnTyp f ++ "<" ++ prettyDeBruijnTyp a ++ ">"
 
 prettyDeBruijnTyEnv :: CoreFE.TyEnv -> String
 prettyDeBruijnTyEnv [] = ""

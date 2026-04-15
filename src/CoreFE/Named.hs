@@ -76,6 +76,7 @@ data Typ
   | TyEnvt   TyEnv          -- Γ
   | TyList   Typ            -- [A]
   | TyProj   Typ String     -- A.l (type projection)
+  | TyApp    Typ Typ         -- type-level application: (∀a. A) B
   deriving (Eq, Show)
 
 --------------------------------------------------------------------------------
@@ -121,6 +122,7 @@ prettyTyp (TySum ctors) =
 prettyTyp (TyEnvt env) = "Env[" ++ prettyTyEnv env ++ "]"
 prettyTyp (TyList t) = "[" ++ prettyTyp t ++ "]"
 prettyTyp (TyProj t l) = prettyTyp t ++ "." ++ l
+prettyTyp (TyApp f a) = prettyTyp f ++ "<" ++ prettyTyp a ++ ">"
 
 prettyTyLit :: Nameless.TyLit -> String
 prettyTyLit Nameless.TyInt  = "int"
@@ -131,6 +133,14 @@ prettyTyLit Nameless.TyUnit = "unit"
 isArrowTyp :: Typ -> Bool
 isArrowTyp (TyArr _ _) = True
 isArrowTyp _ = False
+
+isCompoundTyp :: Typ -> Bool
+isCompoundTyp (TyArr _ _) = True
+isCompoundTyp (TyAll _ _) = True
+isCompoundTyp (TyMu _ _) = True
+isCompoundTyp (TyApp _ _) = True
+isCompoundTyp (TySubstT _ _ _) = True
+isCompoundTyp _ = False
 
 prettyTyEnv :: TyEnv -> String
 prettyTyEnv [] = ""

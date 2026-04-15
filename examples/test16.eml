@@ -1,2 +1,2 @@
 let x : string = input();
-let y = print(x);
+let y : unit = print(x);

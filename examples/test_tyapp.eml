@@ -1,0 +1,12 @@
+type LL = forall t. (Nil as unit | Cons as {data : t, next : LL});
+
+let empty : LL<int> = Nil(()) as LL<int>;
+let a : LL<int> = Cons({data = 2, next = empty}) as LL<int>;
+
+let sum : LL<int> -> int = fix f. fun (l : LL<int>) -> (
+    case l of
+    | <Nil = x> => 0
+    | <Cons = x> => x.data + f(x.next)
+);
+
+let res = sum(a);

@@ -1,0 +1,14 @@
+-- sepcomptest_7: policy functors + polymorphism across modules
+--
+--   policy     (identity : forall, negate : int->int)
+--   transforms (apply functor: POLICY ->m ..., wrap_identity, result)
+--       │  │
+--      app  (imports both, computes r1/r2/r3)
+--
+:sep-obj examples/sepcomptest_7/policy.eml
+:sep-link examples/sepcomptest_7/policy.emlo
+:sep-obj examples/sepcomptest_7/transforms.eml
+:sep-link examples/sepcomptest_7/transforms.emlo
+:sep-obj examples/sepcomptest_7/app.eml
+:sep-link examples/sepcomptest_7/app.emlo examples/sepcomptest_7/policy.emle examples/sepcomptest_7/transforms.emle
+:sep-eval examples/sepcomptest_7/app.emle

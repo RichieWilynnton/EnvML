@@ -24,6 +24,7 @@ data Typ
   | TyEnvt TyEnv
   | TyList Typ -- [A]
   | TyProj Int String -- type-level projection: x_i.l (from expression var at index i)
+  | TyApp Typ Typ -- type-level application: (∀. A) B
   deriving (Eq, Show, Read)
 
 data TyLit
@@ -169,6 +170,7 @@ stringOfTyp (TySum ctors) =
     stringOfCons f (x : xs) = f x ++ " + " ++ stringOfCons f xs
 stringOfTyp (TyList t) = "[" ++ stringOfTyp t ++ "]"
 stringOfTyp (TyProj i l) = "x" ++ show i ++ "." ++ l
+stringOfTyp (TyApp f a) = stringOfTyp f ++ "<" ++ stringOfTyp a ++ ">"
 
 typPrec :: Typ -> Int
 typPrec (TyLit _) = 10
@@ -183,6 +185,7 @@ typPrec (TyBoxT _ _) = 8
 typPrec (TyArr _ _) = 4
 typPrec (TyAll _) = 2
 typPrec (TyMu _) = 2
+typPrec (TyApp _ _) = 9
 
 stringOfTyEnvE :: TyEnvE -> String
 stringOfTyEnvE (Type t) = stringOfTyp t
