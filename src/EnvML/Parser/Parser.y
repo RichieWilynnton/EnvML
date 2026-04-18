@@ -262,7 +262,6 @@ BaseTyp :: { Typ }
   | '[' TyCtx ']'          { TyCtx $2 }
   | list BaseTyp           { TyList $2 }
   | BaseTyp '.' id         { TyProj $1 $3 }
-  | BaseTyp '<' Typ '>'    { TyApp $1 $3 }
   | '(' Typ ')'            { $2 }
   | sig Intf end           { TyModule (TySig $2) }
 

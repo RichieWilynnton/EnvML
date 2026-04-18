@@ -14,3 +14,14 @@ module wrap_identity : forallm t. sig val trans : t -> t; end
       end;
 
 let result : int = apply(|wrap_identity|).f(42);
+
+
+type exp =
+  Var as {str : string}
+| Lam as {name : string, argT : ty, body : exp}
+| App as {funcE : exp, argE : exp}
+| Nat as {n : int};
+
+type maybeTyp =
+    JustTyp as ty
+| ErrorTyp as string;

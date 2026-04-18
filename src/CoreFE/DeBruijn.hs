@@ -232,8 +232,6 @@ toNamelessTyp eNames tNames ty =
       in Nameless.TyProj i l
     Named.TyProj _ l ->
       error ("TyProj: unsupported projection base for ." ++ l)
-    Named.TyApp a b ->
-      Nameless.TyApp (toNamelessTyp eNames tNames a) (toNamelessTyp eNames tNames b)
 
 getTyEntryNames ::
   Named.TyEnv

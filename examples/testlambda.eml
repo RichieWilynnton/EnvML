@@ -9,9 +9,13 @@ type exp =
 | App as {funcE : exp, argE : exp}
 | Nat as {n : int};
 
-type maybe = forall t.
-    Just as t
-| Error as string;
+type maybeExp =
+    JustExp as exp
+| ErrorExp as string;
+
+type maybeTyp =
+    JustTyp as ty
+| ErrorTyp as string;
 
 type tyCtx =
     CtxNil as unit
@@ -39,32 +43,32 @@ let subst : string -> exp -> exp -> exp =
         | <Nat = n> => Nat(n) as exp
     );
 
-let eval : exp -> maybe<exp> =
+let eval : exp -> maybeExp =
     fix go. fun (e : exp) -> (
         case e of
-        | <Var = v> => Error("Runtime error: unbound variable") as maybe<exp>
-        | <Lam = l> => Just(e) as maybe<exp>
-        | <Nat = n> => Just(e) as maybe<exp>
+        | <Var = v> => ErrorExp("Runtime error: unbound variable") as maybeExp
+        | <Lam = l> => JustExp(e) as maybeExp
+        | <Nat = n> => JustExp(e) as maybeExp
         | <App = a> => 
             case go(a.funcE) of
-            | <Error = errF> => Error(errF) as maybe<exp>
-            | <Just = funcVal> =>
+            | <ErrorExp = errF> => ErrorExp(errF) as maybeExp
+            | <JustExp = funcVal> =>
                 case go(a.argE) of
-                | <Error = errA> => Error(errA) as maybe<exp>
-                | <Just = argVal> => 
+                | <ErrorExp = errA> => ErrorExp(errA) as maybeExp
+                | <JustExp = argVal> => 
                     case funcVal of
                     | <Lam = f> => go(subst (f.name) (argVal) (f.body))
-                    | _ => Error("Runtime error: head of application is not a lambda") as maybe<exp>
+                    | _ => ErrorExp("Runtime error: head of application is not a lambda") as maybeExp
                      
     );
 
-let lookupTy : string -> tyCtx -> maybe<ty> =
+let lookupTy : string -> tyCtx -> maybeTyp =
     fix go. fun (name : string) (ctx : tyCtx) -> (
         case ctx of
-        | <CtxNil = n> => Error("Type error: variable not found in context") as maybe<ty>
+        | <CtxNil = n> => ErrorTyp("Type error: variable not found in context") as maybeTyp
         | <CtxCons = c> =>
             if (c.name == name) then
-                Just(c.entryT) as maybe<ty>
+                JustTyp(c.entryT) as maybeTyp
             else
                 go(name)(c.rest)
     );
@@ -73,31 +77,31 @@ let extendCtx : string -> ty -> tyCtx -> tyCtx =
     fun (name : string) (entryT : ty) (rest : tyCtx) ->
         CtxCons({name = name, entryT = entryT, rest = rest}) as tyCtx;
 
-let typeCheck : tyCtx -> exp -> maybe<ty> =
+let typeCheck : tyCtx -> exp -> maybeTyp =
     fix go. fun (ctx : tyCtx) (e : exp) -> (
         case e of
         | <Var = v> => lookupTy(v.str)(ctx)
-        | <Nat = n> => Just(TNat(()) as ty) as maybe<ty>
+        | <Nat = n> => JustTyp(TNat(()) as ty) as maybeTyp
         | <Lam = l> => (
             case go(extendCtx(l.name)(l.argT)(ctx))(l.body) of
-            | <Just = bodyT> =>
-                Just(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybe<ty>
-            | <Error = err> => Error(err) as maybe<ty>
+            | <JustTyp = bodyT> =>
+                JustTyp(TArrow({arg = l.argT, ret = bodyT}) as ty) as maybeTyp
+            | <ErrorTyp = err> => ErrorTyp(err) as maybeTyp
         )
         | <App = a> =>
             case go(ctx)(a.funcE) of
-            | <Error = errF> => Error(errF) as maybe<ty>
-            | <Just = funcT> =>
+            | <ErrorTyp = errF> => ErrorTyp(errF) as maybeTyp
+            | <JustTyp = funcT> =>
                 case go(ctx)(a.argE) of
-                | <Error = errA> => Error(errA) as maybe<ty>
-                | <Just = argT> =>
+                | <ErrorTyp = errA> => ErrorTyp(errA) as maybeTyp
+                | <JustTyp = argT> =>
                     case funcT of
                     | <TArrow = arr> =>
                         if arr.arg == argT then
-                            Just(arr.ret) as maybe<ty>
+                            JustTyp(arr.ret) as maybeTyp
                         else
-                            Error("Type error: argument type mismatch") as maybe<ty>
-                    | _ => Error("Type error: attempted to apply a non-function") as maybe<ty>
+                            ErrorTyp("Type error: argument type mismatch") as maybeTyp
+                    | _ => ErrorTyp("Type error: attempted to apply a non-function") as maybeTyp
     );
 
 -- ========== subst test ==========
@@ -140,5 +144,3 @@ struct
     let evalRes = eval (app2);
 end
 ;
-
-
