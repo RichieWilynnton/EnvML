@@ -1,0 +1,17 @@
+-- sepcomptest_lambda: Lambda calculus split across 4 modules
+--
+--   syntax  (ty, exp, maybeExp, maybeTyp, tyCtx)
+--     │  \
+--   eval    check  (subst+eval, lookupTy+extendCtx+typeCheck)
+--     │      │
+--      app   (builds an expression, type-checks it, evaluates it)
+--
+:sep-obj examples/sepcomptest_lambda/syntax.eml
+:sep-link examples/sepcomptest_lambda/syntax.emlo
+:sep-obj examples/sepcomptest_lambda/eval.eml
+:sep-link examples/sepcomptest_lambda/eval.emlo examples/sepcomptest_lambda/syntax.emle
+:sep-obj examples/sepcomptest_lambda/check.eml
+:sep-link examples/sepcomptest_lambda/check.emlo examples/sepcomptest_lambda/syntax.emle
+:sep-obj examples/sepcomptest_lambda/app.eml
+:sep-link examples/sepcomptest_lambda/app.emlo examples/sepcomptest_lambda/syntax.emle examples/sepcomptest_lambda/eval.emle examples/sepcomptest_lambda/check.emle
+:sep-eval examples/sepcomptest_lambda/app.emle

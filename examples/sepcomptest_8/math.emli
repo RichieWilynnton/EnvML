@@ -1,0 +1,3 @@
+type Num = int;
+val add : Num -> Num -> Num;
+val square : Num -> Num;

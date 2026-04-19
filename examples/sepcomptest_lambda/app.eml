@@ -1,0 +1,17 @@
+import syntax;
+import eval;
+import check;
+
+let emptyCtx = CtxNil(()) as syntax.tyCtx;
+
+-- Build: (fun (x : nat -> nat) -> fun (y : nat) -> x(y)) (fun (x : nat) -> x) (2)
+let body : syntax.exp = App({funcE = Var({str = "x"}) as syntax.exp, argE = Var({str = "y"}) as syntax.exp}) as syntax.exp;
+let funY : syntax.exp = Lam({name = "y", argT = TNat(()) as syntax.ty, body = body}) as syntax.exp;
+let funX : syntax.exp = Lam({name = "x", argT = TArrow({arg = TNat(()) as syntax.ty, ret = TNat(()) as syntax.ty}) as syntax.ty, body = funY}) as syntax.exp;
+let id   : syntax.exp = Lam({name = "x", argT = TNat(()) as syntax.ty, body = Var({str = "x"}) as syntax.exp}) as syntax.exp;
+let two  : syntax.exp = Nat({n = 2}) as syntax.exp;
+let app1 : syntax.exp = App({funcE = funX, argE = id}) as syntax.exp;
+let app2 : syntax.exp = App({funcE = app1, argE = two}) as syntax.exp;
+
+let typeCheckRes = check.typeCheck(emptyCtx)(app2);
+let evalRes      = eval.eval(app2);

@@ -30,6 +30,7 @@ data ModuleTyp
   | ForallM   Name ModuleTyp  -- ∀t. I
   | TySig     Intf            -- (sig .. end)
   | TyVarM    Name            -- M
+  | BoxM      TyCtx ModuleTyp -- [ctx] ==>m I
   deriving (Show, Eq)
 
 type Intf = [IntfE]                    -- (sig ... end) .eli
@@ -39,6 +40,7 @@ data IntfE
   | ModDecl     Name Typ               -- (module M : S)
   | FunctorDecl Name FunArgs Typ       -- (functor m (type t) (x: A) : S)
   | SigDecl     Name Intf              -- (module type S = ...)
+  | ImportDecl  Name                   -- (import M) in .emli files
   deriving (Show, Eq)
 
 data Typ
@@ -260,6 +262,7 @@ prettyIntfE (ModDecl n mt) = "module " ++ n ++ " : " ++ prettyTyp mt
 prettyIntfE (FunctorDecl n args mt) = 
   "functor " ++ n ++ " " ++ prettyFunArgs args ++ " : " ++ prettyTyp mt
 prettyIntfE (SigDecl n intf) = "module type " ++ n ++ " = sig " ++ prettyIntf intf ++ " end"
+prettyIntfE (ImportDecl n) = "import " ++ n
 
 prettyIntf :: Intf -> String
 prettyIntf [] = ""
@@ -286,6 +289,8 @@ prettyModuleTyp (ForallM n m) =
 prettyModuleTyp (TySig intf) = 
   "sig " ++ prettyIntf intf ++ " end"
 prettyModuleTyp (TyVarM n) = n
+prettyModuleTyp (BoxM ctx m) =
+  "[" ++ prettyTyCtx ctx ++ "] ==>m " ++ prettyModuleTyp m
 
 -- Type pretty printing
 prettyTyp :: Typ -> String

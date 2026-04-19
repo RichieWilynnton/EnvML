@@ -345,7 +345,7 @@ cmdSepObj path = do
               putStrLn "✓ Core type check succeeded!"
               putStrLn $ "  Type: " ++ CoreFE.pretty typ
               srcMod <- Parse.parseEmlFile path
-              let deps     = Parse.collectImports srcMod
+              let deps     = Parse.collectEmlImports srcMod
                   obj      = ObjFile { objDeps = deps, objExp = coreNameless }
                   emloPath = replaceExtension path ".emlo"
               writeFile emloPath (show obj)

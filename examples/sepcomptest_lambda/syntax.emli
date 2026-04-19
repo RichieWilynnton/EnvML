@@ -1,0 +1,22 @@
+type ty =
+  TNat as unit
+| TBool as unit
+| TArrow as {arg : ty, ret : ty};
+
+type exp =
+  Var as {str : string}
+| Lam as {name : string, argT : ty, body : exp}
+| App as {funcE : exp, argE : exp}
+| Nat as {n : int};
+
+type maybeExp =
+    JustExp as exp
+| ErrorExp as string;
+
+type maybeTyp =
+    JustTyp as ty
+| ErrorTyp as string;
+
+type tyCtx =
+    CtxNil as unit
+| CtxCons as {name : string, entryT : ty, rest : tyCtx};

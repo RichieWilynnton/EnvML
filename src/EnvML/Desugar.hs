@@ -1,4 +1,4 @@
-module EnvML.Desugar (desugarModule, desugarModuleWithImports, desugarExp, desugarModuleTyp, resolveImports) where
+module EnvML.Desugar (desugarModule, desugarModuleWithImports, desugarExp, desugarModuleTyp, resolveImports, resolveEmliFile) where
 
 import qualified EnvML.Syntax as Src
 import qualified EnvML.Desugared as D
@@ -61,11 +61,46 @@ resolveImports path = do
   m <- parseModule . lexer <$> readFile path
   let baseDir     = takeDirectory path
       importNames = [n | Src.Import n <- case m of Src.Struct ss -> ss; _ -> []]
-  importTypes <- mapM (\n -> fmap (\mty -> (n, desugarModuleTyp mty)) (parseModuleTyp . lexer <$> readFile (baseDir </> n ++ ".emli"))) importNames
-  mainSig     <- desugarModuleTyp . parseModuleTyp . lexer <$> readFile (replaceExtension path ".emli")
+  importTypes <- mapM (\n -> fmap (\mty -> (n, mty)) (resolveEmliFile (baseDir </> n ++ ".emli"))) importNames
+  mainSig     <- resolveEmliFile (replaceExtension path ".emli")
   let desugared      = desugarModuleWithImports importTypes m
       annotationType = foldr (\(_, impSig) acc -> Src.TyArrowM (Src.TyModule impSig) acc) mainSig importTypes
   return $ D.MAnno desugared annotationType
+
+-- | Parse an .emli file, resolve its imports by reading neighbouring .emli
+-- files, and wrap each type in the interface with TyBoxT using the import
+-- context. Returns a fully resolved ModuleTyp.
+resolveEmliFile :: FilePath -> IO Src.ModuleTyp
+resolveEmliFile path = do
+  mty <- parseModuleTyp . lexer <$> readFile path
+  let baseDir     = takeDirectory path
+      importNames = collectEmliImportsMty mty
+  if null importNames
+    then return (desugarModuleTyp mty)
+    else do
+      importTypes <- mapM (\n -> fmap (\sig -> (n, sig)) (resolveEmliFile (baseDir </> n ++ ".emli"))) importNames
+      let importCtx = [Src.TyMod n sig | (n, sig) <- importTypes]
+      return (desugarModuleTyp (wrapIntfWithBox importCtx mty))
+
+-- | Collect import names from a ModuleTyp
+collectEmliImportsMty :: Src.ModuleTyp -> [Src.Name]
+collectEmliImportsMty (Src.TySig intf) = [n | Src.ImportDecl n <- intf]
+collectEmliImportsMty _                = []
+
+-- | Wrap the module type with BoxM using the import context,
+-- and strip ImportDecl entries.
+wrapIntfWithBox :: Src.TyCtx -> Src.ModuleTyp -> Src.ModuleTyp
+wrapIntfWithBox ctx (Src.TySig intf) =
+  Src.BoxM ctx (Src.TySig [e | e <- intf, not (isImportDecl e)])
+wrapIntfWithBox ctx (Src.TyArrowM t m) =
+  Src.TyArrowM t (wrapIntfWithBox ctx m)
+wrapIntfWithBox ctx (Src.ForallM n m) =
+  Src.ForallM n (wrapIntfWithBox ctx m)
+wrapIntfWithBox _ other = other
+
+isImportDecl :: Src.IntfE -> Bool
+isImportDecl (Src.ImportDecl _) = True
+isImportDecl _                  = False
 
 desugarExp :: Src.Exp -> D.Exp
 desugarExp e = case e of
@@ -140,6 +175,7 @@ desugarModuleTyp :: Src.ModuleTyp -> Src.ModuleTyp
 desugarModuleTyp (Src.TySig intf)   = Src.TySig (map desugarIntfE intf)
 desugarModuleTyp (Src.TyArrowM t m) = Src.TyArrowM (desugarTyp t) (desugarModuleTyp m)
 desugarModuleTyp (Src.ForallM n m)  = Src.ForallM n (desugarModuleTyp m)
+desugarModuleTyp (Src.BoxM ctx m)   = Src.BoxM (reverse ctx) (desugarModuleTyp m)
 desugarModuleTyp other              = other
 
 desugarIntfE :: Src.IntfE -> Src.IntfE
@@ -148,6 +184,7 @@ desugarIntfE (Src.ValDecl n t)       = Src.ValDecl n (desugarTyp t)
 desugarIntfE (Src.ModDecl n t)       = Src.ModDecl n (desugarTyp t)
 desugarIntfE (Src.FunctorDecl n a t) = Src.FunctorDecl n a (desugarTyp t)
 desugarIntfE (Src.SigDecl n intf)    = Src.SigDecl n (map desugarIntfE intf)
+desugarIntfE (Src.ImportDecl n)      = Src.ImportDecl n
 
 desugarTypWithBinder :: Maybe Src.Name -> Src.Typ -> Src.Typ
 desugarTypWithBinder mb ty = case ty of

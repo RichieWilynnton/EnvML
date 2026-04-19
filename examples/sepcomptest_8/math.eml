@@ -1,0 +1,4 @@
+type Num = int;
+
+let add : Num -> Num -> Num = fun (x : Num) (y : Num) -> x + y;
+let square : Num -> Num = fun (x : Num) -> x * x;

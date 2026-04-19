@@ -207,6 +207,7 @@ infer g (D.RProj e l) = do
   where
     projType (TyRcd fields) = lookup l fields
     projType (TyModule (TySig intf)) = lookupIntf l intf
+    projType (TyModule (BoxM ctx (TySig intf))) = lookupIntf l intf
     projType _ = Nothing
 infer g (D.Anno e t) =
   if check g e t then Just t else Nothing
@@ -347,6 +348,8 @@ checkMod g m (TyVarM name) =
   case lookupModTypeEq g name of
     Just mty -> checkMod g m mty
     Nothing -> False
+checkMod g m (BoxM ctx mty) =
+  checkMod (ctx ++ g) m mty
 checkMod g (D.Functor name (TmArgType ty) m) (TyArrowM a mty) =
   teq g ty a g && checkMod (bindModEntry name a : g) m mty
 checkMod g (D.Functor name TmArg m) (TyArrowM a mty) =
@@ -396,16 +399,20 @@ resolveTySum g (TyVar x) =
   lookupTypeEq g x >>= resolveTySum g
 resolveTySum g (TyMu n body) =
   resolveTySum g (typeSubstName n (TyMu n body) body)
+resolveTySum g t@(TyProj _ _) =
+  resolveTyProj g t >>= resolveTySum g
 resolveTySum _ _ = Nothing
 
 unfoldMu :: TyCtx -> Typ -> Maybe Typ
 unfoldMu _ (TyMu n body) = Just (typeSubstName n (TyMu n body) body)
 unfoldMu g (TyVar x) = lookupTypeEq g x >>= unfoldMu g
+unfoldMu g t@(TyProj _ _) = resolveTyProj g t >>= unfoldMu g
 unfoldMu _ _ = Nothing
 
 resolveToMu :: TyCtx -> Typ -> Maybe (Name, Typ)
 resolveToMu _ (TyMu n body) = Just (n, body)
 resolveToMu g (TyVar x) = lookupTypeEq g x >>= resolveToMu g
+resolveToMu g t@(TyProj _ _) = resolveTyProj g t >>= resolveToMu g
 resolveToMu _ _ = Nothing
 
 inferCaseBranches :: TyCtx -> [(Name, Typ)] -> [D.CaseBranch] -> Maybe Typ
@@ -444,6 +451,8 @@ mtyEq g1 (TyArrowM a1 m1) (TyArrowM a2 m2) g2 =
 mtyEq g1 (ForallM n1 m1) (ForallM n2 m2) g2 =
   mtyEq (KindN n1 : g1) m1 (substModTypName n2 (TyVar n1) m2) (KindN n1 : g2)
 mtyEq g1 (TySig i1) (TySig i2) g2 = intfEq g1 i1 i2 g2
+mtyEq g1 (BoxM ctx m1) m2 g2 = mtyEq (ctx ++ g1) m1 m2 g2
+mtyEq g1 m1 (BoxM ctx m2) g2 = mtyEq g1 m1 m2 (ctx ++ g2)
 mtyEq _ _ _ _ = False
 
 intfEq :: TyCtx -> Intf -> Intf -> TyCtx -> Bool
@@ -468,6 +477,8 @@ substModTypName name s (ForallM n mty)
   | otherwise = ForallM n (substModTypName name s mty)
 substModTypName name s (TySig intf) = TySig (substIntfName name s intf)
 substModTypName _ _ (TyVarM n) = TyVarM n
+substModTypName name s (BoxM ctx mty) =
+  BoxM (tyCtxSubstName name s ctx) (substModTypName name s mty)
 
 substIntfName :: Name -> Typ -> Intf -> Intf
 substIntfName _ _ [] = []
@@ -481,3 +492,5 @@ substIntfName name s (FunctorDecl n args ty : rest) =
   FunctorDecl n args (typeSubstName name s ty) : substIntfName name s rest
 substIntfName name s (SigDecl n intf : rest) =
   SigDecl n (substIntfName name s intf) : substIntfName name s rest
+substIntfName name s (ImportDecl n : rest) =
+  ImportDecl n : substIntfName name s rest

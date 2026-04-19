@@ -1,0 +1,40 @@
+import syntax;
+
+let subst : syntax.exp -> string -> syntax.exp -> syntax.exp =
+    fix go. fun (value : syntax.exp) (name : string) (e : syntax.exp) -> (
+        case e of
+        | <Var = v> =>
+            if (v.str == name) then
+                value
+            else
+                Var(v) as syntax.exp
+        | <Lam = l> =>
+            if (l.name == name) then
+                Lam({name = l.name, argT = l.argT, body = l.body}) as syntax.exp
+            else
+                Lam({name = l.name, argT = l.argT, body = go(value)(name)(l.body)}) as syntax.exp
+        | <App = a> =>
+            App({
+                funcE = go(value)(name)(a.funcE),
+                argE = go(value)(name)(a.argE)
+            }) as syntax.exp
+        | <Nat = n> => Nat(n) as syntax.exp
+    );
+
+let eval : syntax.exp -> syntax.maybeExp =
+    fix go. fun (e : syntax.exp) -> (
+        case e of
+        | <Var = v> => ErrorExp("Runtime error: unbound variable") as syntax.maybeExp
+        | <Lam = l> => JustExp(e) as syntax.maybeExp
+        | <Nat = n> => JustExp(e) as syntax.maybeExp
+        | <App = a> =>
+            case go(a.funcE) of
+            | <ErrorExp = errF> => ErrorExp(errF) as syntax.maybeExp
+            | <JustExp = funcVal> =>
+                case go(a.argE) of
+                | <ErrorExp = errA> => ErrorExp(errA) as syntax.maybeExp
+                | <JustExp = argVal> =>
+                    case funcVal of
+                    | <Lam = f> => go(subst (argVal) (f.name) (f.body))
+                    | _ => ErrorExp("Runtime error: head of application is not a lambda") as syntax.maybeExp
+    );

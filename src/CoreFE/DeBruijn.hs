@@ -211,7 +211,7 @@ toNamelessTyp eNames tNames ty =
     Named.TyBoxT tyEnv a ->
       Nameless.TyBoxT
         (toNamelessTyEnv eNames tNames tyEnv)
-        (toNamelessTyp [] (getTyEntryNames tyEnv) a)
+        (toNamelessTyp (getTermEntryNames tyEnv) (getTyEntryNames tyEnv) a)
     Named.TySubstT n a b ->
       Nameless.TySubstT
         (toNamelessTyp eNames tNames a)
@@ -243,6 +243,14 @@ getTyEntryNames (t:tyenv)                =
       n = getTyEntryName t
   in  n:names'
 
+-- | Extract term-level names (Type entries) from a TyEnv for use in TyProj resolution
+getTermEntryNames ::
+  Named.TyEnv
+  -> ExpNames
+getTermEntryNames [] = []
+getTermEntryNames ((Named.Type n _):tyenv) = (n, TermBinding) : getTermEntryNames tyenv
+getTermEntryNames (_:tyenv) = getTermEntryNames tyenv
+
 getTyEntryName ::
   Named.TyEnvE
   -> Name
@@ -257,9 +265,10 @@ toNamelessTyEnv ::
   -> Nameless.TyEnv
 toNamelessTyEnv _ _ [] = []
 toNamelessTyEnv eNames tNames (t : rest) =
-  let restTypNames = getTyEntryNames rest ++ tNames   -- names from rest + outer
-      t'    = toNamelessTyEnvE eNames restTypNames t  -- t sees rest + outer
-      rest' = toNamelessTyEnv eNames tNames rest      -- rest sees outer only
+  let restTypNames = getTyEntryNames rest ++ tNames    -- type names from rest + outer
+      restExpNames = getTermEntryNames rest ++ eNames  -- term names from rest + outer
+      t'    = toNamelessTyEnvE restExpNames restTypNames t  -- t sees rest + outer
+      rest' = toNamelessTyEnv eNames tNames rest           -- rest sees outer only
   in  t' : rest'
 
 toNamelessTyEnvE ::

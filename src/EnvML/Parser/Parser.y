@@ -151,6 +151,7 @@ IntfE :: { IntfE }
   | functor id FunArgs ':' id ';'        { FunctorDecl $2 $3 (TyVar $5) }
   | functor id FunArgs ':' ModuleTyp ';' { FunctorDecl $2 $3 (TyModule $5) }
   | module  type id '=' Intf ';'         { SigDecl $3 $5 }
+  | import  id ';'                       { ImportDecl $2 }
 
 Exp :: { Exp }
   : fun FunArgs '->' Exp                  { Lam $2 $4 }

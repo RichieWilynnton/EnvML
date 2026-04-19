@@ -2,7 +2,6 @@ module CoreFE.Check where
 
 import Control.Monad (guard)
 import CoreFE.Syntax
-import Debug.Trace (trace, traceM)
 
 -- | Count type variable bindings (Etvar and Eteq) in an environment
 keyLen :: TyEnv -> Int
@@ -185,7 +184,7 @@ lbIn _ _ = False
 
 wrapping :: TyEnv -> Typ -> Maybe Typ
 wrapping [] a = Just a
-wrapping (Type _ : g) a = wrapping g a
+wrapping g@(Type _ : g') a = wrapping g' (normTyp g a)
 wrapping (TypeEq c : g) a = wrapping g (TySubstT c a)
 wrapping (TypeDef _ c : g) a = wrapping g (TySubstT c a)
 wrapping (Kind : _) _ = Nothing
@@ -211,6 +210,9 @@ resolveProjEnv g (TySubstT s t) = do
   env <- resolveProjEnv g t
   pure (env ++ [TypeEq s])
 resolveProjEnv g (TyMu t) = resolveProjEnv g (TySubstT (TyMu t) t)
+resolveProjEnv g (TyBoxT ctx t) = do
+  env <- resolveProjEnv (ctx ++ g) t
+  pure (env ++ ctx)
 resolveProjEnv _ _ = Nothing
 
 -- | Resolve a type projection from an expression variable

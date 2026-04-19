@@ -1,0 +1,5 @@
+import syntax;
+
+val lookupTy  : syntax.tyCtx -> string -> syntax.maybeTyp;
+val extendCtx : syntax.tyCtx -> string -> syntax.ty -> syntax.tyCtx;
+val typeCheck : syntax.tyCtx -> syntax.exp -> syntax.maybeTyp;

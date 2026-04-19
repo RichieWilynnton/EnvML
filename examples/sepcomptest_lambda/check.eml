@@ -1,0 +1,43 @@
+import syntax;
+
+let lookupTy : syntax.tyCtx -> string -> syntax.maybeTyp =
+    fix go. fun (ctx : syntax.tyCtx) (name : string) -> (
+        case ctx of
+        | <CtxNil = n> => ErrorTyp("Type error: variable not found in context") as syntax.maybeTyp
+        | <CtxCons = c> =>
+            if (c.name == name) then
+                JustTyp(c.entryT) as syntax.maybeTyp
+            else
+                go(c.rest)(name)
+    );
+
+let extendCtx : syntax.tyCtx -> string -> syntax.ty -> syntax.tyCtx =
+    fun (rest : syntax.tyCtx) (name : string) (entryT : syntax.ty) ->
+        CtxCons({name = name, entryT = entryT, rest = rest}) as syntax.tyCtx;
+
+let typeCheck : syntax.tyCtx -> syntax.exp -> syntax.maybeTyp =
+    fix go. fun (ctx : syntax.tyCtx) (e : syntax.exp) -> (
+        case e of
+        | <Var = v> => lookupTy(ctx)(v.str)
+        | <Nat = n> => JustTyp(TNat(()) as syntax.ty) as syntax.maybeTyp
+        | <Lam = l> => (
+            case go(extendCtx(ctx)(l.name)(l.argT))(l.body) of
+            | <JustTyp = bodyT> =>
+                JustTyp(TArrow({arg = l.argT, ret = bodyT}) as syntax.ty) as syntax.maybeTyp
+            | <ErrorTyp = err> => ErrorTyp(err) as syntax.maybeTyp
+        )
+        | <App = a> =>
+            case go(ctx)(a.funcE) of
+            | <ErrorTyp = errF> => ErrorTyp(errF) as syntax.maybeTyp
+            | <JustTyp = funcT> =>
+                case go(ctx)(a.argE) of
+                | <ErrorTyp = errA> => ErrorTyp(errA) as syntax.maybeTyp
+                | <JustTyp = argT> =>
+                    case funcT of
+                    | <TArrow = arr> =>
+                        if arr.arg == argT then
+                            JustTyp(arr.ret) as syntax.maybeTyp
+                        else
+                            ErrorTyp("Type error: argument type mismatch") as syntax.maybeTyp
+                    | _ => ErrorTyp("Type error: attempted to apply a non-function") as syntax.maybeTyp
+    );

@@ -2,7 +2,8 @@
 module EnvML.Parse
   ( parseEmlFile
   , parseEmliFile
-  , collectImports
+  , collectEmlImports
+  , collectEmliImports
   , module EnvML.Syntax
   ) where
 
@@ -17,6 +18,11 @@ parseEmliFile :: FilePath -> IO ModuleTyp
 parseEmliFile path = parseModuleTyp . lexer <$> readFile path
 
 -- | Collect top-level import names from a parsed module.
-collectImports :: Module -> [Name]
-collectImports (Struct structs) = [n | Import n <- structs]
-collectImports _                = []
+collectEmlImports :: Module -> [Name]
+collectEmlImports (Struct structs) = [n | Import n <- structs]
+collectEmlImports _                = []
+
+-- | Collect import names from a parsed interface.
+collectEmliImports :: ModuleTyp -> [Name]
+collectEmliImports (TySig intf) = [n | ImportDecl n <- intf]
+collectEmliImports _            = []

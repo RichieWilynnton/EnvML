@@ -1,0 +1,12 @@
+import syntax;
+
+val emptyCtx     : syntax.tyCtx;
+val body         : syntax.exp;
+val funY         : syntax.exp;
+val funX         : syntax.exp;
+val id           : syntax.exp;
+val two          : syntax.exp;
+val app1         : syntax.exp;
+val app2         : syntax.exp;
+val typeCheckRes : syntax.maybeTyp;
+val evalRes      : syntax.maybeExp;

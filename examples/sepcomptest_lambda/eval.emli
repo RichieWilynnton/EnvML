@@ -1,0 +1,4 @@
+import syntax;
+
+val subst : syntax.exp -> string -> syntax.exp -> syntax.exp;
+val eval  : syntax.exp -> syntax.maybeExp;

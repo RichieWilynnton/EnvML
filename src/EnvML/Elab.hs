@@ -180,6 +180,8 @@ elabModTyp mty =
       CoreFE.TyEnvt (elabIntf intf)
     EnvML.TyVarM name ->
       CoreFE.TyVar name
+    EnvML.BoxM ctx rest ->
+      CoreFE.TyBoxT (elabTyCtx ctx) (elabModTyp rest)
 
 elabIntf :: EnvML.Intf -> CoreFE.TyEnv
 elabIntf = map elabIntfE . reverse
@@ -197,3 +199,5 @@ elabIntfE ie =
       CoreFE.Type name (elabTyp ty)
     EnvML.SigDecl name intf ->
       CoreFE.TypeEq name (CoreFE.TyEnvt (elabIntf intf))
+    EnvML.ImportDecl _ ->
+      error "ImportDecl should have been resolved before elaboration"

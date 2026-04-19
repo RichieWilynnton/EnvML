@@ -35,7 +35,8 @@ topoSort graph = do
       return (Map.insert node Done states', order' ++ [node])
 
 -- | Transitively discover all modules reachable from an entry file by
--- following imports. All .eml files are assumed to be in the same directory.
+-- following imports in both .eml and .emli files.
+-- All files are assumed to be in the same directory.
 discoverDeps :: FilePath -> String -> IO (Map.Map String [String])
 discoverDeps dir = go Map.empty . Set.singleton
   where
@@ -46,14 +47,22 @@ discoverDeps dir = go Map.empty . Set.singleton
           if Map.member name acc
             then go acc rest
             else do
-              let path = dir </> name ++ ".eml"
-              exists <- doesFileExist path
-              if not exists
-                then error $ "Module '" ++ name ++ "' not found: " ++ path
+              let emlPath  = dir </> name ++ ".eml"
+                  emliPath = dir </> name ++ ".emli"
+              emlExists <- doesFileExist emlPath
+              if not emlExists
+                then error $ "Module '" ++ name ++ "' not found: " ++ emlPath
                 else do
-                  srcMod <- Parse.parseEmlFile path
-                  let deps = Parse.collectImports srcMod
-                  go (Map.insert name deps acc) (rest `Set.union` Set.fromList deps)
+                  srcMod <- Parse.parseEmlFile emlPath
+                  let emlDeps = Parse.collectEmlImports srcMod
+                  emliExists <- doesFileExist emliPath
+                  emliDeps <- if emliExists
+                    then do
+                      mty <- Parse.parseEmliFile emliPath
+                      return (Parse.collectEmliImports mty)
+                    else return []
+                  let allDeps = Set.toList $ Set.fromList (emlDeps ++ emliDeps)
+                  go (Map.insert name allDeps acc) (rest `Set.union` Set.fromList allDeps)
 
 -- | Build a project starting from a single .eml entry file.
 -- Transitively discovers all imported modules, topologically sorts them,

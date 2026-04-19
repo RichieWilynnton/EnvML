@@ -1,0 +1,11 @@
+-- sepcomptest_emli_import: Test importing types from .emli files
+--
+--   math  (type Num = int, add, square)
+--     │
+--   main  (uses math.Num via .emli import)
+--
+:sep-obj examples/sepcomptest_emli_import/math.eml
+:sep-link examples/sepcomptest_emli_import/math.emlo
+:sep-obj examples/sepcomptest_emli_import/main.eml
+:sep-link examples/sepcomptest_emli_import/main.emlo examples/sepcomptest_emli_import/math.emle
+:sep-eval examples/sepcomptest_emli_import/main.emle
