@@ -4,7 +4,7 @@ A language implementation featuring first-class environments with a multi-stage 
 
 ## Table of Contents
 - [WASM Playground (No Setup Required)](#wasm-playground-no-setup-required)
-- [Building from Source](#building-from-source)
+- [Building from Source & Running CLI REPL](#building-from-source)
 
 ---
 
