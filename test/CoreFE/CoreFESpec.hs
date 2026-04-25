@@ -7,34 +7,43 @@ import CoreFE.Parser.Lexer (lexer)
 import CoreFE.Parser.Parser (parseExp, parseTyp, parseEnv)
 import Test.Hspec
 
--- Helpers: parse and evaluate
+-- | Parse a CoreFE expression string into an 'Exp'.
 pExp :: String -> Exp
 pExp = parseExp . lexer
 
+-- | Parse a CoreFE type string into a 'Typ'.
 pTyp :: String -> Typ
 pTyp = parseTyp . lexer
 
+-- | Parse a CoreFE type environment string into a 'TyEnv'.
 pEnv :: String -> TyEnv
 pEnv = parseEnv . lexer
 
+-- | Evaluate a CoreFE expression in the empty environment.
 eval0 :: Exp -> IO (Maybe Exp)
 eval0 = runEval []
 
+-- | Parse and evaluate a CoreFE expression string in the empty environment.
 evalP :: String -> IO (Maybe Exp)
 evalP = eval0 . pExp
 
+-- | Parse and type-infer a CoreFE expression string in the empty context.
 inferP :: String -> Maybe Typ
 inferP s = infer [] (pExp s)
 
+-- | Parse and infer a CoreFE expression in a given type environment string.
 inferInCtx :: String -> String -> Maybe Typ
 inferInCtx env expr = infer (pEnv env) (pExp expr)
 
+-- | Check a CoreFE expression string against a type string in the empty context.
 checkP :: String -> String -> Bool
 checkP expr typ = check [] (pExp expr) (pTyp typ)
 
+-- | Check a CoreFE expression string against a type in a given type environment.
 checkInCtx :: String -> String -> String -> Bool
 checkInCtx env expr typ = check (pEnv env) (pExp expr) (pTyp typ)
 
+-- | Test type equality of two type strings under given type environment strings.
 isTypEq :: String -> String -> String -> String -> Bool
 isTypEq g1 a1 a2 g2 = teq (pEnv g1) (pTyp a1) (pTyp a2) (pEnv g2)
 

@@ -5,6 +5,7 @@ import qualified CoreFE.Syntax as CoreFE
 import EnvML.Syntax (Name, Typ(..), TyCtxE(..), TyCtx, ModuleTyp(..), FunArg(..), Intf, IntfE(..))
 import qualified EnvML.Desugared as D
 
+-- | Substitute type @s@ for name @n@ in a named type, respecting binder shadowing.
 typeSubstName :: Name -> Typ -> Typ -> Typ
 typeSubstName _ _ (TyLit l) = TyLit l
 typeSubstName name s (TyVar n)
@@ -25,6 +26,7 @@ typeSubstName name s (TyProj t l) = TyProj (typeSubstName name s t) l
 typeSubstName name s (TyCtx ctx) = TyCtx (tyCtxSubstName name s ctx)
 typeSubstName name s (TyModule mty) = TyModule (substModTypName name s mty)
 
+-- | Apply a named type substitution throughout a type context.
 tyCtxSubstName :: Name -> Typ -> TyCtx -> TyCtx
 tyCtxSubstName _ _ [] = []
 tyCtxSubstName name s (TypeN n t : rest)
@@ -40,6 +42,7 @@ tyCtxSubstName _ _ (Type _ : _) = error "Unnamed Type in TyCtx not supported."
 tyCtxSubstName _ _ (Kind : _) = error "Unnamed Kind in TyCtx not supported."
 tyCtxSubstName name s (e : rest) = e : tyCtxSubstName name s rest
 
+-- | Look up the type equation for a name in a type context.
 lookupTypeEq :: TyCtx -> Name -> Maybe Typ
 lookupTypeEq [] _ = Nothing
 lookupTypeEq (TypeEqN n t : _) x | n == x = Just t
@@ -48,6 +51,7 @@ lookupTypeEq (Type _ : _) _ = error "Unnamed Type in TyCtx not supported."
 lookupTypeEq (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 lookupTypeEq (_ : g) x = lookupTypeEq g x
 
+-- | Return 'True' if the context contains no abstract type variables ('KindN').
 concrete :: TyCtx -> Bool
 concrete = not . any isKindOrUnsupported
   where
@@ -56,6 +60,7 @@ concrete = not . any isKindOrUnsupported
     isKindOrUnsupported (Type _)  = error "Unnamed Type in TyCtx not supported."
     isKindOrUnsupported _         = False
 
+-- | Named bidirectional type equality under two type contexts.
 teq :: TyCtx -> Typ -> Typ -> TyCtx -> Bool
 teq _ (TyLit a) (TyLit b) _ = a == b
 teq g1 (TyVar x) b g2 =
@@ -104,6 +109,7 @@ teq g1 (TyModule m1) (TyModule m2) g2 =
   mtyEq g1 m1 m2 g2
 teq _ _ _ _ = False
 
+-- | Pointwise equality of two named type contexts under outer contexts.
 teqCtx :: TyCtx -> TyCtx -> TyCtx -> TyCtx -> Bool
 teqCtx _ [] [] _ = True
 teqCtx g1 (KindN _ : e1) (KindN _ : e2) g2 =
@@ -118,6 +124,7 @@ teqCtx _ (Kind : _) _ _ = error "Unnamed Kind in TyCtx not supported."
 teqCtx _ _ (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 teqCtx _ _ _ _ = False
 
+-- | Resolve a type projection '@TyProj@' via the module signature bound to that name.
 resolveTyProj :: TyCtx -> Typ -> Maybe Typ
 resolveTyProj g (TyProj (TyVar name) label) =
   case getMod g name of
@@ -125,6 +132,7 @@ resolveTyProj g (TyProj (TyVar name) label) =
     _ -> Nothing
 resolveTyProj _ _ = Nothing
 
+-- | Look up the type of a term variable in a named type context.
 getVar :: TyCtx -> Name -> Maybe Typ
 getVar [] _ = Nothing
 getVar (TypeN n a : _) x | n == x = Just a
@@ -133,6 +141,7 @@ getVar (Type _ : _) _ = error "Unnamed Type in TyCtx not supported."
 getVar (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 getVar (_ : g) x = getVar g x
 
+-- | Look up a module type alias in a type context.
 lookupModTypeEq :: TyCtx -> Name -> Maybe ModuleTyp
 lookupModTypeEq [] _ = Nothing
 lookupModTypeEq (TypeEqM n mty : _) x | n == x = Just mty
@@ -140,6 +149,7 @@ lookupModTypeEq (Type _ : _) _ = error "Unnamed Type in TyCtx not supported."
 lookupModTypeEq (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 lookupModTypeEq (_ : g) x = lookupModTypeEq g x
 
+-- | Resolve a member label within an interface, substituting prior type definitions.
 lookupIntf :: Name -> Intf -> Maybe Typ
 lookupIntf l intf = go intf
   where
@@ -153,6 +163,7 @@ lookupIntf l intf = go intf
     go (SigDecl n i : _) | n == l = Just (TyModule (TySig i))
     go (_ : rest) = go rest
 
+-- | Infer the type of a surface expression.
 infer :: TyCtx -> D.Exp -> Maybe Typ
 infer _ (D.Lit lit) = pure $ TyLit $ inferLit lit
   where
@@ -282,6 +293,7 @@ infer g (D.ETake _ e) = do
   return (TyList t)
 infer _ _ = Nothing
 
+-- | Infer the module type of a module expression.
 inferMod :: TyCtx -> D.Module -> Maybe ModuleTyp
 inferMod g (D.VarM name) = getMod g name
 inferMod g (D.Struct structs) = TySig <$> inferStructs g structs
@@ -303,6 +315,7 @@ inferMod g (D.MAnno m mty) = do
   guard (checkMod g m mty)
   return mty
 
+-- | Look up the module type of a module variable.
 getMod :: TyCtx -> Name -> Maybe ModuleTyp
 getMod [] _ = Nothing
 getMod (TyMod n mty : _) x | n == x = Just mty
@@ -310,10 +323,12 @@ getMod (Type _ : _) _ = error "Unnamed Type in TyCtx not supported."
 getMod (Kind : _) _ = error "Unnamed Kind in TyCtx not supported."
 getMod (_ : g) x = getMod g x
 
+-- | Construct a context entry for a module function argument.
 bindModEntry :: Name -> Typ -> TyCtxE
 bindModEntry name (TyModule mty) = TyMod name mty
 bindModEntry name ty = TypeN name ty
 
+-- | Infer the interface of a struct body.
 inferStructs :: TyCtx -> D.Structures -> Maybe Intf
 inferStructs g ss = inferStructs' g (reverse ss)
 
@@ -324,6 +339,7 @@ inferStructs' g (s : rest) = do
   entries <- inferStructs' g' rest
   return (entry : entries)
 
+-- | Infer the interface entry and updated context for a single struct item.
 inferStructure :: TyCtx -> D.Structure -> Maybe (IntfE, TyCtx)
 inferStructure g (D.Let name Nothing e) = do
   t <- infer g e
@@ -343,6 +359,7 @@ inferStructure g (D.ModStruct name (Just mty) m) = do
   guard (checkMod g m mty)
   return (ModDecl name (TyModule mty), TyMod name mty : g)
 
+-- | Check that a module matches a given module type.
 checkMod :: TyCtx -> D.Module -> ModuleTyp -> Bool
 checkMod g m (TyVarM name) =
   case lookupModTypeEq g name of
@@ -365,6 +382,7 @@ checkMod g m mty =
     Just mty' -> mtyEq g mty' mty g
     Nothing -> False
 
+-- | Check an expression against a type.
 check :: TyCtx -> D.Exp -> Typ -> Bool
 check g (D.Lam name mty e) (TyArr a b) =
   case mty of
@@ -393,6 +411,7 @@ check g e t =
     Just t' -> teq g t' t g
     _ -> False
 
+-- | Resolve a named type to its sum constructor list.
 resolveTySum :: TyCtx -> Typ -> Maybe [(Name, Typ)]
 resolveTySum _ (TySum ctors) = Just ctors
 resolveTySum g (TyVar x) =
@@ -403,18 +422,21 @@ resolveTySum g t@(TyProj _ _) =
   resolveTyProj g t >>= resolveTySum g
 resolveTySum _ _ = Nothing
 
+-- | Unfold one step of a recursive mu type.
 unfoldMu :: TyCtx -> Typ -> Maybe Typ
 unfoldMu _ (TyMu n body) = Just (typeSubstName n (TyMu n body) body)
 unfoldMu g (TyVar x) = lookupTypeEq g x >>= unfoldMu g
 unfoldMu g t@(TyProj _ _) = resolveTyProj g t >>= unfoldMu g
 unfoldMu _ _ = Nothing
 
+-- | Unwrap a mu type to expose its binder name and body.
 resolveToMu :: TyCtx -> Typ -> Maybe (Name, Typ)
 resolveToMu _ (TyMu n body) = Just (n, body)
 resolveToMu g (TyVar x) = lookupTypeEq g x >>= resolveToMu g
 resolveToMu g t@(TyProj _ _) = resolveTyProj g t >>= resolveToMu g
 resolveToMu _ _ = Nothing
 
+-- | Infer the result type of case branches, checking all agree.
 inferCaseBranches :: TyCtx -> [(Name, Typ)] -> [D.CaseBranch] -> Maybe Typ
 inferCaseBranches _ _ [] = Nothing
 inferCaseBranches g ctors (b : bs) = do
@@ -427,12 +449,14 @@ inferCaseBranches g ctors (b : bs) = do
     bs
   return t
 
+-- | Infer the result type of a single named case branch, binding the payload.
 inferCaseBranch :: TyCtx -> [(Name, Typ)] -> D.CaseBranch -> Maybe Typ
 inferCaseBranch g _ (D.CaseBranch "_" _ body) = infer g body
 inferCaseBranch g ctors (D.CaseBranch ctor binder body) = do
   payloadTy <- lookup ctor ctors
   infer (TypeN binder payloadTy : g) body
 
+-- | Module type equality under two type contexts.
 mtyEq :: TyCtx -> ModuleTyp -> ModuleTyp -> TyCtx -> Bool
 mtyEq g1 (TyVarM n) m2 g2 =
   case lookupModTypeEq g1 n of
@@ -455,6 +479,7 @@ mtyEq g1 (BoxM ctx m1) m2 g2 = mtyEq (ctx ++ g1) m1 m2 g2
 mtyEq g1 m1 (BoxM ctx m2) g2 = mtyEq g1 m1 m2 (ctx ++ g2)
 mtyEq _ _ _ _ = False
 
+-- | Interface equality: check two interfaces are equivalent under outer contexts.
 intfEq :: TyCtx -> Intf -> Intf -> TyCtx -> Bool
 intfEq _ [] [] _ = True
 intfEq g1 (TyDef n1 t1 : r1) (TyDef n2 t2 : r2) g2 =
@@ -469,6 +494,7 @@ intfEq g1 (SigDecl n1 i1 : r1) (SigDecl n2 i2 : r2) g2 =
   n1 == n2 && intfEq g1 i1 i2 g2 && intfEq g1 r1 r2 g2
 intfEq _ _ _ _ = False
 
+-- | Substitute a type for a name throughout a module type.
 substModTypName :: Name -> Typ -> ModuleTyp -> ModuleTyp
 substModTypName name s (TyArrowM ty mty) =
   TyArrowM (typeSubstName name s ty) (substModTypName name s mty)
@@ -480,6 +506,7 @@ substModTypName _ _ (TyVarM n) = TyVarM n
 substModTypName name s (BoxM ctx mty) =
   BoxM (tyCtxSubstName name s ctx) (substModTypName name s mty)
 
+-- | Substitute a type for a name throughout an interface.
 substIntfName :: Name -> Typ -> Intf -> Intf
 substIntfName _ _ [] = []
 substIntfName name s (TyDef n ty : rest) =

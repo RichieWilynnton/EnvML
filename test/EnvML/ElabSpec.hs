@@ -12,11 +12,11 @@ import qualified CoreFE.DeBruijn as DB
 import qualified CoreFE.Syntax as CoreFE
 import Test.Hspec
 
--- | Parse and desugar an expression (all elab tests go through desugaring now)
+-- | Parse and desugar an EnvML expression string for elaboration tests.
 pde :: String -> D.Exp
 pde input = desugarExp (parseExp (lexer input))
 
--- | Parse and desugar a module
+-- | Parse and desugar an EnvML module string for elaboration tests.
 pdm :: String -> D.Module
 pdm input = desugarModule (parseModule (lexer input))
 

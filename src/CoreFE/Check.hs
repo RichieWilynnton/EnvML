@@ -26,8 +26,7 @@ tshift x (TySum ctors) = TySum [(l, tshift x t) | (l, t) <- ctors]
 tshift x (TyMu t) = TyMu (tshift (1 + x) t)
 tshift _ t@(TyProj _ _) = t -- expression indices don't shift with type shifts
 
--- | TODO: Immediate substitution should be avoided
--- | Type substitution: replace TyVar i with s in t, shifting vars > i down by 1
+-- | Substitute type @s@ for de Bruijn index @i@ in @t@, shifting free variables above @i@ down by 1.
 typeSubst :: Typ -> Int -> Typ -> Typ
 typeSubst _ _ (TyLit l) = TyLit l
 typeSubst s i (TyVar j)
@@ -45,6 +44,7 @@ typeSubst s i (TyList a) = TyList (typeSubst s i a)
 typeSubst s i (TySum ctors) = TySum [(l, typeSubst s i t) | (l, t) <- ctors]
 typeSubst _ _ t@(TyProj _ _) = t -- no type vars to substitute in expression index
 
+-- | Apply type substitution throughout a type environment, adjusting indices for binders.
 tyEnvSubst :: Typ -> Int -> TyEnv -> TyEnv
 tyEnvSubst _ _ [] = []
 tyEnvSubst s i (Kind : rest) = Kind : tyEnvSubst (tshift 0 s) (i + 1) rest
@@ -55,6 +55,7 @@ tyEnvSubst s i (TypeDef n a : rest) =
 tyEnvSubst s i (Type a : rest) =
   Type (typeSubst s (i + keyLen rest) a) : tyEnvSubst s i rest
 
+-- | Shift free type variables in each binding of a 'TyEnv' by @x@, accounting for binder depth.
 tshiftBinds :: Int -> TyEnv -> TyEnv
 tshiftBinds _ [] = []
 tshiftBinds x (Kind : bs) = Kind : tshiftBinds x bs
@@ -65,6 +66,7 @@ tshiftBinds x (TypeEq a : bs) =
 tshiftBinds x (TypeDef n a : bs) =
   TypeDef n (tshift (keyLen bs + x) a) : tshiftBinds x bs
 
+-- | Compute the 'Kind'-based de Bruijn index of a type variable, skipping 'Type' and equality entries.
 inner :: TyEnv -> Int -> Maybe Int
 inner [] _ = Nothing
 inner (Type _ : g) x = inner g x
@@ -75,6 +77,7 @@ inner (TypeDef _ _ : g) x = inner g (x - 1)
 inner (Kind : _g) 0 = pure 0
 inner (Kind : g) x = (+ 1) <$> inner g (x - 1)
 
+-- | Look up the type equality bound to a type variable index, returning it shifted into scope.
 lookt :: TyEnv -> Int -> Maybe Typ
 lookt [] _ = Nothing
 lookt (Type _ : t) x = lookt t x
@@ -85,9 +88,11 @@ lookt (TypeDef _ _a : t) x = tshift 0 <$> lookt t (x - 1)
 lookt (Kind : _t) 0 = Nothing
 lookt (Kind : t) x = tshift 0 <$> lookt t (x - 1)
 
+-- | Return 'True' if the environment contains no abstract type variable binders ('Kind').
 concrete :: TyEnv -> Bool
 concrete g = all (/= Kind) g
 
+-- | Bidirectional type equality under two (possibly distinct) type environments.
 teq :: TyEnv -> Typ -> Typ -> TyEnv -> Bool
 teq _ (TyLit a) (TyLit b) _ = a == b
 teq g1 (TyVar x) b g2 =
@@ -139,6 +144,7 @@ teq g1 a (TyProj i l) g2 =
     Nothing -> False
 teq _ _ _ _ = False
 
+-- | Pointwise equality of two type environments under outer contexts.
 teqEnv :: TyEnv -> TyEnv -> TyEnv -> TyEnv -> Bool
 teqEnv _ [] [] _ = True
 teqEnv g1 (Kind : e1) (Kind : e2) g2 =
@@ -155,6 +161,7 @@ teqEnv g1 (TypeEq a : e1) (TypeDef _ b : e2) g2 =
   teqEnv g1 e1 e2 g2 && teq (e1 ++ g1) a b (e2 ++ g2)
 teqEnv _ _ _ _ = False
 
+-- | Test whether an expression is a closed value (irreducible normal form).
 value :: Exp -> Bool
 value (Lit _) = True
 value (Clos e _) = lvalue e
@@ -167,6 +174,7 @@ value (Prim _) = True
 value (EList es) = all value es -- ADD THIS
 value _ = False
 
+-- | Test whether every expression binding in an environment is a value.
 lvalue :: Env -> Bool
 lvalue [] = True
 lvalue (ExpE v : e) = lvalue e && value v
@@ -176,12 +184,14 @@ lvalue (TypE _ : _) = False
 lvalue (TypEN _ (TyBoxT _ _) : e) = lvalue e
 lvalue (TypEN _ _ : _) = False
 
+-- | Check whether a label @l@ is bound at the head of a 'TyEnvt' type.
 lbIn :: String -> Typ -> Bool
 lbIn l (TyEnvt (Type (TyRcd l' _) : _)) = l == l'
 lbIn l (TyEnvt (Type _ : g)) = lbIn l (TyEnvt g)
 lbIn l (TyEnvt (TypeEq _ : g)) = lbIn l (TyEnvt g)
 lbIn _ _ = False
 
+-- | Wrap a type in the substitutions accumulated by the tail of an environment.
 wrapping :: TyEnv -> Typ -> Maybe Typ
 wrapping [] a = Just a
 wrapping g@(Type _ : g') a = wrapping g' (normTyp g a)
@@ -189,6 +199,7 @@ wrapping (TypeEq c : g) a = wrapping g (TySubstT c a)
 wrapping (TypeDef _ c : g) a = wrapping g (TySubstT c a)
 wrapping (Kind : _) _ = Nothing
 
+-- | Look up the type of a record label in a type environment.
 rlk :: TyEnv -> String -> Maybe Typ
 rlk [] _ = Nothing
 rlk (Type (TyRcd l1 a) : g1) l
@@ -202,6 +213,7 @@ rlk (TypeEq _ : g1) l = rlk g1 l
 rlk (TypeDef _ _ : g1) l = rlk g1 l
 rlk _ _ = Nothing
 
+-- | Resolve a type to the 'TyEnv' it wraps, unfolding 'TyRcd', variables, substitutions, and mu types.
 resolveProjEnv :: TyEnv -> Typ -> Maybe TyEnv
 resolveProjEnv _ (TyEnvt env) = Just env
 resolveProjEnv g (TyRcd _ t) = resolveProjEnv g t
@@ -232,6 +244,7 @@ tlk (TypeEq _ : g1) l = tlk g1 l
 tlk (Type _ : g1) l = tlk g1 l
 tlk (Kind : _) _ = Nothing
 
+-- | Look up the type of the expression variable at de Bruijn index @i@.
 getVar :: TyEnv -> Int -> Maybe Typ
 getVar [] _ = Nothing
 getVar (Kind : g) x = tshift 0 <$> getVar g x
@@ -240,6 +253,7 @@ getVar (TypeDef _ _ : g) x = tshift 0 <$> getVar g x
 getVar (Type a : _) 0 = Just a
 getVar (Type _ : g) x = getVar g (x - 1)
 
+-- | Extract the body of a recursive type, unfolding through variables and substitutions.
 resolveMuBody :: TyEnv -> Typ -> Maybe Typ
 resolveMuBody _ (TyMu body) = Just body
 resolveMuBody g (TyVar x) = lookt g x >>= resolveMuBody g
@@ -422,6 +436,7 @@ check g e t =
     Just t' -> teq g t' t g
     _ -> False
 
+-- | Infer the result type of a sequence of case branches, ensuring all agree.
 inferCaseBranches :: TyEnv -> [(String, Typ)] -> [CaseBranch] -> Maybe Typ
 inferCaseBranches _ _ [] = Nothing
 inferCaseBranches g ctors (b : rest) = do
@@ -435,19 +450,23 @@ inferCaseBranches g ctors (b : rest) = do
       guard (teq g expectedTy branchTy' g)
       inferRemaining expectedTy bs
 
+-- | Infer the result type of a single case branch by binding the payload type.
 inferCaseBranch :: TyEnv -> [(String, Typ)] -> CaseBranch -> Maybe Typ
 inferCaseBranch g ctors (CaseBranch ctor body) = do
   payloadTy <- payloadTyForBranch ctor ctors
   infer (Type payloadTy : g) body
 
+-- | Return the payload type for a constructor, treating @"_"@ as a wildcard matching the first.
 payloadTyForBranch :: String -> [(String, Typ)] -> Maybe Typ
 payloadTyForBranch "_" ctors = firstPayloadTy ctors
 payloadTyForBranch ctor ctors = lookup ctor ctors
 
+-- | Return the payload type of the first constructor in a sum-type list.
 firstPayloadTy :: [(String, Typ)] -> Maybe Typ
 firstPayloadTy [] = Nothing
 firstPayloadTy ((_, ty) : _) = Just ty
 
+-- | Resolve a type to its constructor list, unfolding variables, substitutions, and mu types.
 resolveTySum :: TyEnv -> Typ -> Maybe [(String, Typ)]
 resolveTySum _ (TySum ctors) = Just ctors
 resolveTySum g (TyVar x) = lookt g x >>= resolveTySum g

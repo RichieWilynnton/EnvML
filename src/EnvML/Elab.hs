@@ -6,9 +6,11 @@ import qualified CoreFE.Named as CoreFE
 import qualified EnvML.Desugared as D
 import qualified EnvML.Syntax as EnvML
 
+-- | Elaborate a desugared module into a CoreFE expression.
 elabModule :: D.Module -> CoreFE.Exp
 elabModule = elabModuleExp
 
+-- | Core recursive worker for module elaboration.
 elabModuleExp :: D.Module -> CoreFE.Exp
 elabModuleExp modl =
   case modl of
@@ -27,10 +29,11 @@ elabModuleExp modl =
     D.MAnno m mty ->
       CoreFE.Anno (elabModuleExp m) (elabModTyp mty)
 
--- (already reversed by desugaring)
+-- | Elaborate a list of desugared structure items into a CoreFE environment.
 elabStructures :: D.Structures -> CoreFE.Env
 elabStructures = map elabStructure
 
+-- | Elaborate a single structure item into a CoreFE environment entry.
 elabStructure :: D.Structure -> CoreFE.EnvE
 elabStructure struct =
   case struct of
@@ -47,6 +50,7 @@ elabStructure struct =
         Nothing -> CoreFE.ModE name (elabModuleExp mod1)
         Just mty -> CoreFE.ModE name (CoreFE.Anno (elabModuleExp mod1) (elabModTyp mty))
 
+-- | Elaborate a desugared expression into its CoreFE named representation.
 elabExp :: D.Exp -> CoreFE.Exp
 elabExp e =
   case e of
@@ -104,15 +108,17 @@ elabExp e =
     D.ETake i e1 -> CoreFE.ETake i (elabExp e1)
     D.Prim n -> CoreFE.Prim n
 
+-- | Elaborate a list of named record fields into CoreFE record expressions.
 elabRecords :: [(EnvML.Name, D.Exp)] -> [CoreFE.Exp]
 elabRecords [] = []
 elabRecords ((n, e) : rest) =
   CoreFE.Rec n (elabExp e) : elabRecords rest
 
--- Environments are already reversed by desugaring
+-- | Elaborate a desugared environment into a CoreFE environment.
 elabEnv :: D.Env -> CoreFE.Env
 elabEnv = map elabEnvE
 
+-- | Elaborate a single desugared environment entry into a CoreFE entry.
 elabEnvE :: D.EnvE -> CoreFE.EnvE
 elabEnvE envE =
   case envE of
@@ -123,6 +129,7 @@ elabEnvE envE =
     D.ModE name m -> CoreFE.ModE name (elabModule m)
     D.ModTypE name mty -> CoreFE.TypE name (elabModTyp mty)
 
+-- | Elaborate an EnvML surface type into its CoreFE named type.
 elabTyp :: EnvML.Typ -> CoreFE.Typ
 elabTyp ty = case ty of
     EnvML.TyLit lit -> CoreFE.TyLit lit
@@ -140,10 +147,11 @@ elabTyp ty = case ty of
     EnvML.TyList ty1 -> CoreFE.TyList (elabTyp ty1)
     EnvML.TyProj ty1 l -> CoreFE.TyProj (elabTyp ty1) l
 
--- TyCtx is already reversed by desugaring
+-- | Elaborate a named type context into a CoreFE type environment.
 elabTyCtx :: EnvML.TyCtx -> CoreFE.TyEnv
 elabTyCtx = map elabTyCtxE
 
+-- | Elaborate a single named type context entry into a CoreFE type environment entry.
 elabTyCtxE :: EnvML.TyCtxE -> CoreFE.TyEnvE
 elabTyCtxE ctxE =
   case ctxE of
@@ -160,15 +168,18 @@ elabTyCtxE ctxE =
     EnvML.TypeEqM name mty ->
       CoreFE.TypeEq name (elabModTyp mty)
 
+-- | Elaborate named record type fields into a flat list of CoreFE record types.
 elabRcdFieldsTy :: [(EnvML.Name, EnvML.Typ)] -> [CoreFE.Typ]
 elabRcdFieldsTy [] = []
 elabRcdFieldsTy ((n, ty) : rest) =
   CoreFE.TyRcd n (elabTyp ty) : elabRcdFieldsTy rest
 
+-- | Elaborate a desugared case branch into a CoreFE case branch.
 elabCaseBranch :: D.CaseBranch -> CoreFE.CaseBranch
 elabCaseBranch (D.CaseBranch ctor binder body) =
   CoreFE.CaseBranch ctor binder (elabExp body)
 
+-- | Elaborate a module type into its CoreFE type representation.
 elabModTyp :: EnvML.ModuleTyp -> CoreFE.Typ
 elabModTyp mty =
   case mty of
@@ -183,9 +194,11 @@ elabModTyp mty =
     EnvML.BoxM ctx rest ->
       CoreFE.TyBoxT (elabTyCtx ctx) (elabModTyp rest)
 
+-- | Elaborate an interface into a CoreFE type environment.
 elabIntf :: EnvML.Intf -> CoreFE.TyEnv
 elabIntf = map elabIntfE . reverse
 
+-- | Elaborate a single interface entry into a CoreFE type environment entry.
 elabIntfE :: EnvML.IntfE -> CoreFE.TyEnvE
 elabIntfE ie =
   case ie of

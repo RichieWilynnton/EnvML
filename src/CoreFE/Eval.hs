@@ -4,6 +4,7 @@ import CoreFE.Syntax
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.IO.Class (liftIO)
 
+-- | Look up the value at a de Bruijn index in a runtime environment, skipping type bindings.
 lookupv :: Env -> Int -> Maybe Exp
 lookupv [] _ = Nothing
 lookupv (ExpE v : _) 0 = pure v
@@ -13,6 +14,7 @@ lookupv (RecE _ : xs) n = lookupv xs (n - 1)
 lookupv (TypE _ : xs) n = lookupv xs n
 lookupv (TypEN _ _ : xs) n = lookupv xs n
 
+-- | Extract type bindings from a runtime environment as a 'TyEnv' for type-checking closures.
 c2g :: Env -> TyEnv
 c2g env = concatMap f env
   where
@@ -20,11 +22,12 @@ c2g env = concatMap f env
     f (TypEN name a) = [TypeDef name a]
     f _ = []
 
+-- | Wrap a type in a 'TyBoxT' environment unless it is already boxed.
 wrapEnvInTyBox :: TyEnv -> Typ -> Typ
 wrapEnvInTyBox _ t@(TyBoxT _ _) = t
 wrapEnvInTyBox env t = TyBoxT env t
 
--- Record lookup
+-- | Look up a record field by label in a 'FEnv' expression value.
 rlookupv :: Exp -> String -> Maybe Exp
 rlookupv (FEnv (ExpE (Rec l1 v) : d)) l
   | l == l1 = pure v
@@ -35,9 +38,11 @@ rlookupv (FEnv (_ : d)) l =
   rlookupv (FEnv d) l
 rlookupv _ _ = Nothing
 
+-- | Lift a 'Maybe' into 'MaybeT' for use in monadic evaluation chains.
 hoistMaybe :: (Monad m) => Maybe a -> MaybeT m a
 hoistMaybe = MaybeT . return
 
+-- | Evaluate an expression to a value under a runtime environment.
 eval :: Env -> Exp -> MaybeT IO Exp
 eval env = go
   where
@@ -154,9 +159,11 @@ eval env = go
         EList vs <- eval env e
         pure $ EList (take n vs)
 
+-- | Run evaluation, returning 'Nothing' if evaluation gets stuck.
 runEval :: Env -> Exp -> IO (Maybe Exp)
 runEval env e = runMaybeT (eval env e)
 
+-- | Find the body of the first branch matching a constructor tag, with @"_"@ as wildcard.
 lookupCaseBranch :: String -> [CaseBranch] -> Maybe Exp
 lookupCaseBranch _ [] = Nothing
 lookupCaseBranch ctor (CaseBranch ctor' body : rest)

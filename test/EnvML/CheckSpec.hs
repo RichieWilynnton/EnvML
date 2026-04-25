@@ -12,13 +12,15 @@ import Data.Maybe (isJust)
 import Test.Hspec
 import Debug.Trace (trace)
 
+-- | Parse and desugar an EnvML expression string.
 pe :: String -> D.Exp
 pe input = desugarExp (parseExp (lexer input))
 
+-- | Parse an EnvML type string.
 pt :: String -> Typ
 pt input = parseTyp (lexer input)
 
--- Helper: parse a module, desugar, and infer its structures
+-- | Parse, desugar, and infer the interface of a module string.
 inferMod' :: String -> Maybe Intf
 inferMod' input =
   let m = desugarModule (parseModule (lexer input))

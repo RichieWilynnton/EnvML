@@ -7,7 +7,7 @@ import CoreFE.DeBruijn (toNamelessExp, toNamelessTyp, toDeBruijn, toDeBruijnTyp)
 import CoreFE.Check (check, infer)
 import CoreFE.Eval (runEval)
 
--- Helper to run full pipeline
+-- | Run the full named → de Bruijn → infer → eval pipeline, returning all three results.
 runPipeline :: Named.Exp -> IO (Maybe (Nameless.Exp, Nameless.Typ, Nameless.Exp))
 runPipeline namedExp = do
   let namelessExp = toDeBruijn namedExp

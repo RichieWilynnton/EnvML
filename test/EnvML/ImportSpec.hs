@@ -16,21 +16,24 @@ import Test.Hspec
 -- Helpers
 -- ---------------------------------------------------------------------------
 
+-- | Parse and desugar a module string with no pre-loaded import types.
 pm :: String -> D.Module
 pm input = desugarModuleWithImports [] (parseModule (lexer input))
 
+-- | Parse an EnvML module type string.
 pmt :: String -> ModuleTyp
 pmt input = parseModuleTyp (lexer input)
 
--- | Parse a module string and apply importTypes via desugarModuleWithImports.
+-- | Parse and desugar a module string with a set of pre-loaded import types.
 pmWith :: [(Name, ModuleTyp)] -> String -> D.Module
 pmWith importTypes input =
   desugarModuleWithImports importTypes (parseModule (lexer input))
 
--- | Path helpers for example import files (relative to project root)
+-- | Path to the example single-import file.
 singleImportFile :: FilePath
 singleImportFile = "examples/sepcomptest_0/main.eml"
 
+-- | Path to the example multi-import file.
 multiImportFile :: FilePath
 multiImportFile = "examples/sepcomptest_1/main.eml"
 

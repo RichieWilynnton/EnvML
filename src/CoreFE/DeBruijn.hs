@@ -15,7 +15,7 @@ type TypNames   = [Name]
     Δ : list of type Names   -- type variables only (TypE bindings)
 -}
 
--- index computation
+-- | Compute the de Bruijn index of a term variable in an expression name context.
 indexE :: Name -> ExpNames -> (Int, BindingKind)
 indexE x []    = error ("unbound: " ++ x)
 indexE x ((x', kind):g) =
@@ -23,6 +23,7 @@ indexE x ((x', kind):g) =
     let (y, kind') = indexE x g
     in  (1 + y, kind')
 
+-- | Convert a named expression to its nameless (de Bruijn) representation.
 toNamelessExp ::
   ExpNames
   -> TypNames
@@ -141,6 +142,7 @@ toNamelessExp eNames tNames e =
     (Named.Prim n)        ->
       Nameless.Prim n
 
+-- | Collect term-variable names from an environment, in order, for index computation.
 envToExpNames ::
   Named.Env
   -> ExpNames
@@ -149,6 +151,7 @@ envToExpNames (Named.ExpE n _:rest) = (n, TermBinding):envToExpNames rest
 envToExpNames (Named.ModE n _:rest) = (n, ModBinding):envToExpNames rest
 envToExpNames (Named.TypE _ _:rest) = envToExpNames rest
 
+-- | Collect type-variable names from an environment, in order, for index computation.
 envToTypNames ::
   Named.Env
   -> TypNames
@@ -157,6 +160,7 @@ envToTypNames (Named.TypE n _: rest)
                        = n:envToTypNames rest
 envToTypNames (_:rest) = envToTypNames rest
 
+-- | Convert a named environment to its nameless representation.
 toNamelessEnv ::
   ExpNames
   -> TypNames
@@ -170,6 +174,7 @@ toNamelessEnv eNames tNames (e:env)=
       env' = toNamelessEnv eNames tNames env
   in  e':env'
 
+-- | Convert a single named environment entry to its nameless form.
 toNamelessEnvE ::
   ExpNames
   -> TypNames
@@ -183,16 +188,19 @@ toNamelessEnvE eNames tNames entry =
       let t' = toNamelessTyp eNames tNames t
       in if n == "_" then Nameless.TypE t' else Nameless.TypEN n t'
 
+-- | Extract the binder name from a named environment entry.
 getEntryName :: Named.EnvE -> Name
 getEntryName (Named.ExpE n _e) = n
 getEntryName (Named.ModE n _e) = n
 getEntryName (Named.TypE n _e) = n
 
+-- | Compute the de Bruijn index of a type variable in a type name context.
 indexT :: Name -> TypNames -> Int
 indexT a []     = error ("unbound" ++ a)
 indexT a (a':g) =
   if a == a' then 0 else 1 + indexT a g
 
+-- | Convert a named type to its nameless (de Bruijn) representation.
 toNamelessTyp ::
   ExpNames
   -> TypNames
@@ -233,6 +241,7 @@ toNamelessTyp eNames tNames ty =
     Named.TyProj _ l ->
       error ("TyProj: unsupported projection base for ." ++ l)
 
+-- | Extract type-variable entry names from a named type environment.
 getTyEntryNames ::
   Named.TyEnv
   -> TypNames
@@ -251,6 +260,7 @@ getTermEntryNames [] = []
 getTermEntryNames ((Named.Type n _):tyenv) = (n, TermBinding) : getTermEntryNames tyenv
 getTermEntryNames (_:tyenv) = getTermEntryNames tyenv
 
+-- | Extract the binder name from a named type environment entry.
 getTyEntryName ::
   Named.TyEnvE
   -> Name
@@ -258,6 +268,7 @@ getTyEntryName (Named.Type n _)   = n
 getTyEntryName (Named.Kind n)     = n
 getTyEntryName (Named.TypeEq n _) = n
 
+-- | Convert a named type environment to its nameless representation.
 toNamelessTyEnv ::
   ExpNames
   -> TypNames
@@ -271,6 +282,7 @@ toNamelessTyEnv eNames tNames (t : rest) =
       rest' = toNamelessTyEnv eNames tNames rest           -- rest sees outer only
   in  t' : rest'
 
+-- | Convert a single named type environment entry to its nameless form.
 toNamelessTyEnvE ::
   ExpNames
   -> TypNames
@@ -284,12 +296,15 @@ toNamelessTyEnvE eNames tNames entry =
       let ty' = toNamelessTyp eNames tNames ty
       in if n == "_" then Nameless.TypeEq ty' else Nameless.TypeDef n ty'
 
+-- | Top-level entry point: convert a fully named expression to de Bruijn form.
 toDeBruijn :: Named.Exp -> Nameless.Exp
 toDeBruijn = toNamelessExp [] []
 
+-- | Top-level entry point: convert a fully named type to de Bruijn form.
 toDeBruijnTyp :: Named.Typ -> Nameless.Typ
 toDeBruijnTyp = toNamelessTyp [] []
 
+-- | Convert a named case branch to its nameless form, binding the branch variable.
 toNamelessCaseBranch :: ExpNames -> TypNames -> Named.CaseBranch -> Nameless.CaseBranch
 toNamelessCaseBranch eNames tNames (Named.CaseBranch ctor binder body) =
   Nameless.CaseBranch ctor (toNamelessExp ((binder, TermBinding) : eNames) tNames body)
