@@ -54,10 +54,11 @@ python3 -m http.server 8000
   - **Eval** - Evaluate and see results
 
 - **Pre-loaded Examples** - Select from dropdown to explore language features
+- **Separate compilation NOT supported as of now**
 
 ---
 
-## Building from Source
+## Building from Source and Running CLI REPL
 
 ### Prerequisites
 
@@ -93,6 +94,18 @@ cabal run
 ```
 
 That's it! The `make` command handles all lexer and parser generation automatically.
+
+### REPL Features
+
+* **Includes all features available in the Web Playground.** 
+* **Separate Compilation:** Supports dependency on other modules using 'import' and compiled with extended separate compilation pipeline.
+
+### Testing and Examples
+
+Pre-made examples are located in the `examples/` directory. Please follow these guidelines for testing:
+
+* **Monolithic Pipeline:** Use the files located directly in the root of the `examples/` directory.
+* **Separate Compilation Pipeline:** Use the files located within the `examples/sepcomp_*` subdirectories.
 
 ### Makefile Targets
 
