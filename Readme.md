@@ -3,11 +3,77 @@
 A language implementation featuring first-class environments with a multi-stage compilation pipeline and interactive WASM playground.
 
 ## Table of Contents
+- [Building from Source](#building-from-source)
+- [Documentation](#documentation)
 - [WASM Playground (No Setup Required)](#wasm-playground-no-setup-required)
-- [Building from Source & Running CLI REPL](#building-from-source)
+- [Running CLI REPL](#running-cli-repl)
 
 ---
+## Building from Source
 
+### Prerequisites
+
+Install `make` to build and run the project:
+
+```bash
+# macOS
+xcode-select --install
+
+# Ubuntu/Debian
+sudo apt-get install build-essential
+
+# Verify
+make --version
+```
+
+**Note:** The build process requires GHC and Cabal. If you don't have them installed:
+
+- **GHC Installation:** Follow the instructions at https://www.haskell.org/ghcup/install/
+- **Cabal Setup:** See the getting started guide at https://cabal.readthedocs.io/en/stable/getting-started.html
+
+### Build and Run
+
+```bash
+# 1. Generate lexer/parser files and build the project
+make
+
+# 2. Run tests
+make test
+
+# 3. Run the REPL
+cabal run
+```
+
+That's it! The `make` command handles all lexer and parser generation automatically.
+
+
+### Makefile Targets
+
+```bash
+# Build project (generates parsers/lexers automatically)
+make
+
+# Build with clean (removes all build artifacts first)
+make build CLEAN=1
+
+# Run tests
+make test
+
+# Clean all generated files and build artifacts
+make clean
+```
+
+## Documentation
+To generate documentation, run:
+```bash
+# generates .html documentation
+cabal haddock
+```
+
+After running this command, a directory containing the .html files will be shown on the terminal. Open `index.html` in that directory to view the file in the browser.
+
+### Tests
+All unit tests are in the `test/` directory. They are accompanied with descriptions that describes their role.
 ## WASM Playground (No Setup Required)
 
 The WASM playground provides an interactive web interface to explore EnvML's compilation pipeline without any installation.
@@ -58,44 +124,8 @@ python3 -m http.server 8000
 
 ---
 
-## Building from Source and Running CLI REPL
 
-### Prerequisites
-
-Install `make` to build and run the project:
-
-```bash
-# macOS
-xcode-select --install
-
-# Ubuntu/Debian
-sudo apt-get install build-essential
-
-# Verify
-make --version
-```
-
-**Note:** The build process requires GHC and Cabal. If you don't have them installed:
-
-- **GHC Installation:** Follow the instructions at https://www.haskell.org/ghcup/install/
-- **Cabal Setup:** See the getting started guide at https://cabal.readthedocs.io/en/stable/getting-started.html
-
-### Build and Run
-
-```bash
-# 1. Generate lexer/parser files and build the project
-make
-
-# 2. Run tests
-make test
-
-# 3. Run the REPL
-cabal run
-```
-
-That's it! The `make` command handles all lexer and parser generation automatically.
-
-### REPL Features
+## REPL Features
 
 * **Includes all features available in the Web Playground.** 
 * **Separate Compilation:** Supports dependency on other modules using 'import' and compiled with extended separate compilation pipeline.
@@ -107,21 +137,6 @@ Pre-made examples are located in the `examples/` directory. Please follow these 
 * **Monolithic Pipeline:** Use the files located directly in the root of the `examples/` directory.
 * **Separate Compilation Pipeline:** Use the files located within the `examples/sepcomp_*` subdirectories.
 
-### Makefile Targets
-
-```bash
-# Build project (generates parsers/lexers automatically)
-make
-
-# Build with clean (removes all build artifacts first)
-make build CLEAN=1
-
-# Run tests
-make test
-
-# Clean all generated files and build artifacts
-make clean
-```
 
 ### Project Structure
 
